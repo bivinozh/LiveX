@@ -1,0 +1,38 @@
+package com.example.livex.player
+
+import com.example.livex.core.mvi.UiEffect
+import com.example.livex.core.mvi.UiIntent
+import com.example.livex.core.mvi.UiState
+import com.example.livex.data.SampleStreams
+import com.example.livex.data.Stream
+import com.example.livex.data.Topic
+import com.example.livex.data.Topics
+import com.example.livex.qoe.QoeMetrics
+
+data class PlayerState(
+    val streams: List<Stream> = SampleStreams.all,
+    val streamIndex: Int = 0,
+    val topics: List<Topic> = Topics.all,
+    val topicIndex: Int = 0,
+    val config: PlayerConfig = PlayerConfig(),
+    val metrics: QoeMetrics = QoeMetrics(),
+    val isGuideVisible: Boolean = true,
+) : UiState {
+    val stream: Stream get() = streams[streamIndex]
+    val topic: Topic get() = topics[topicIndex]
+    val isOptimizationEnabled: Boolean
+        get() = topic.optimization?.let { config.isEnabled(it.toggle) } ?: false
+}
+
+sealed interface PlayerIntent : UiIntent {
+    data object NextTopic : PlayerIntent
+    data object PreviousTopic : PlayerIntent
+    data object NextStream : PlayerIntent
+    data object PreviousStream : PlayerIntent
+    data object ToggleOptimization : PlayerIntent
+    data object ToggleGuide : PlayerIntent
+}
+
+sealed interface PlayerEffect : UiEffect {
+    data class ShowMessage(val message: String) : PlayerEffect
+}
