@@ -5,14 +5,14 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import com.example.livex.MainActivity
+import com.example.livex.HiltTestActivity
 import com.example.livex.di.FAKE_GREETING
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import org.junit.Rule
 import org.junit.Test
 
-/** End-to-end Home screen test on a device, with the repository replaced by a Hilt fake. */
+/** Home screen test on a device with real Hilt wiring, the repository replaced by a Hilt fake. */
 @HiltAndroidTest
 class HomeScreenTest {
 
@@ -20,11 +20,13 @@ class HomeScreenTest {
     val hiltRule = HiltAndroidRule(this)
 
     @get:Rule(order = 1)
-    val composeRule = createAndroidComposeRule<MainActivity>()
+    val composeRule = createAndroidComposeRule<HiltTestActivity>()
 
     @OptIn(ExperimentalTestApi::class)
     @Test
     fun launch_showsGreetingFromRepository() {
+        composeRule.setContent { HomeScreen() }
+
         composeRule.waitUntilExactlyOneExists(hasText(FAKE_GREETING), timeoutMillis = 5_000)
         composeRule.onNodeWithText(FAKE_GREETING).assertIsDisplayed()
     }
