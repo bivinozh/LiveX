@@ -2,15 +2,16 @@ package com.example.livex.feature.home
 
 import androidx.lifecycle.viewModelScope
 import com.example.livex.core.mvi.MviViewModel
+import com.example.livex.data.greeting.GreetingRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import kotlin.time.Duration.Companion.milliseconds
 
 @HiltViewModel
-class HomeViewModel @Inject constructor() :
+class HomeViewModel @Inject constructor(
+    private val greetingRepository: GreetingRepository,
+) :
     MviViewModel<HomeState, HomeIntent, HomeEffect>(HomeState()) {
 
     init {
@@ -30,9 +31,8 @@ class HomeViewModel @Inject constructor() :
         setState { copy(isLoading = true, error = null) }
         viewModelScope.launch {
             try {
-                // TODO: replace with a real repository call.
-                delay(500.milliseconds)
-                setState { copy(isLoading = false, greeting = "Hello Android!") }
+                val greeting = greetingRepository.getGreeting()
+                setState { copy(isLoading = false, greeting = greeting) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
