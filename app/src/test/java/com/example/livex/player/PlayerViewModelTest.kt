@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.example.livex.data.SampleStreams
 import com.example.livex.data.Topics
+import com.example.livex.navigation.PlayerRoute
 import com.example.livex.qoe.QoeMetrics
 import com.example.livex.testutil.MainDispatcherRule
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -28,14 +29,44 @@ class PlayerViewModelTest {
     @Before
     fun setUp() {
         engine = FakePlaybackEngine()
-        savedState = SavedStateHandle()
+        savedState = SavedStateHandle(mapOf(PlayerViewModel.KEY_STREAM_ID to SampleStreams.bigBuckBunny.id))
         viewModel = PlayerViewModel(engine, savedState)
     }
 
-    /** Simulates a new ViewModel after process death, restored from [saved]. */
-    private fun recreate(saved: Map<String, Any?>): PlayerViewModel {
+    /** A new ViewModel created from [saved] (navigation argument and/or state restored after process death). */
+    private fun create(saved: Map<String, Any?>): PlayerViewModel {
         engine = FakePlaybackEngine()
         return PlayerViewModel(engine, SavedStateHandle(saved))
+    }
+
+    private fun goToTopic(index: Int) = repeat(index) { viewModel.onIntent(PlayerIntent.NextTopic) }
+
+    // --- Navigation argument ---
+
+    @Test
+    fun `stream id key matches the navigation route property`() {
+        assertEquals(PlayerViewModel.KEY_STREAM_ID, PlayerRoute::streamId.name)
+    }
+
+    @Test
+    fun `plays the stream passed as navigation argument`() {
+        val vm = create(mapOf(PlayerViewModel.KEY_STREAM_ID to SampleStreams.dashIfLivesim.id))
+
+        assertEquals(SampleStreams.dashIfLivesim, vm.state.value.stream)
+        assertEquals(SampleStreams.dashIfLivesim, engine.startedStreams.single())
+    }
+
+    @Test
+    fun `unknown stream id falls back to the first stream`() {
+        val vm = create(mapOf(PlayerViewModel.KEY_STREAM_ID to "does-not-exist"))
+
+        assertEquals(SampleStreams.all.first(), vm.state.value.stream)
+    }
+
+    @Test
+    fun `starts playback with default config on creation`() {
+        assertEquals(listOf(PlayerConfig()), engine.startedConfigs)
+        assertTrue("OkHttp is the default network stack", engine.startedConfigs.single().okHttpNetwork)
     }
 
     // --- Lifecycle ---
@@ -56,8 +87,7 @@ class PlayerViewModelTest {
     }
 
     @Test
-    fun `app stop saves position stream and optimizations`() {
-        viewModel.onIntent(PlayerIntent.NextStream)
+    fun `app stop saves position and optimizations`() {
         goToTopic(Topics.all.indexOf(Topics.bufferTuning))
         viewModel.onIntent(PlayerIntent.ToggleOptimization)
         engine.currentPositionMs = 42_000
@@ -65,8 +95,8 @@ class PlayerViewModelTest {
         viewModel.onIntent(PlayerIntent.LifecycleStop)
 
         assertEquals(42_000L, savedState.get<Long>(PlayerViewModel.KEY_POSITION_MS))
-        assertEquals(1, savedState.get<Int>(PlayerViewModel.KEY_STREAM_INDEX))
         assertEquals(true, savedState.get<Boolean>(PlayerViewModel.KEY_TUNED_BUFFER))
+        assertEquals(true, savedState.get<Boolean>(PlayerViewModel.KEY_OKHTTP_NETWORK))
     }
 
     @Test
@@ -75,28 +105,26 @@ class PlayerViewModelTest {
     }
 
     @Test
-    fun `restores stream position and optimizations after process death`() {
-        val restored = recreate(
+    fun `restores position and optimizations after process death`() {
+        create(
             mapOf(
-                PlayerViewModel.KEY_STREAM_INDEX to 1,
+                PlayerViewModel.KEY_STREAM_ID to SampleStreams.tearsOfSteelDash.id,
                 PlayerViewModel.KEY_POSITION_MS to 42_000L,
                 PlayerViewModel.KEY_TUNED_BUFFER to true,
+                PlayerViewModel.KEY_OKHTTP_NETWORK to false,
             ),
         )
 
-        assertEquals(1, restored.state.value.streamIndex)
-        assertEquals(SampleStreams.all[1], engine.startedStreams.single())
+        assertEquals(SampleStreams.tearsOfSteelDash, engine.startedStreams.single())
         assertEquals(42_000L, engine.startPositions.single())
-        assertEquals(PlayerConfig(tunedBuffer = true), engine.startedConfigs.single())
+        assertEquals(PlayerConfig(tunedBuffer = true, okHttpNetwork = false), engine.startedConfigs.single())
     }
 
     @Test
     fun `live stream is not restored to an old position`() {
-        val liveIndex = SampleStreams.all.indexOfFirst { it.isLive }
-
-        recreate(
+        create(
             mapOf(
-                PlayerViewModel.KEY_STREAM_INDEX to liveIndex,
+                PlayerViewModel.KEY_STREAM_ID to SampleStreams.akamaiLive.id,
                 PlayerViewModel.KEY_POSITION_MS to 42_000L,
             ),
         )
@@ -104,48 +132,7 @@ class PlayerViewModelTest {
         assertNull(engine.startPositions.single())
     }
 
-    @Test
-    fun `out of range saved stream index falls back to first video`() {
-        val restored = recreate(mapOf(PlayerViewModel.KEY_STREAM_INDEX to 99))
-
-        assertEquals(0, restored.state.value.streamIndex)
-    }
-
-    // --- Topics, streams, optimizations ---
-
-    private fun goToTopic(index: Int) = repeat(index) { viewModel.onIntent(PlayerIntent.NextTopic) }
-
-    @Test
-    fun `starts playback with default config on creation`() {
-        assertEquals(listOf(PlayerConfig()), engine.startedConfigs)
-        assertEquals(listOf(SampleStreams.all.first()), engine.startedStreams)
-    }
-
-    @Test
-    fun `next stream starts the next video`() {
-        viewModel.onIntent(PlayerIntent.NextStream)
-
-        assertEquals(1, viewModel.state.value.streamIndex)
-        assertEquals(SampleStreams.all[1], engine.startedStreams.last())
-    }
-
-    @Test
-    fun `previous stream wraps to the last video`() {
-        viewModel.onIntent(PlayerIntent.PreviousStream)
-
-        assertEquals(SampleStreams.all.lastIndex, viewModel.state.value.streamIndex)
-        assertEquals(SampleStreams.all.last(), engine.startedStreams.last())
-    }
-
-    @Test
-    fun `switching video keeps the enabled optimizations`() {
-        goToTopic(Topics.all.indexOf(Topics.bufferTuning))
-        viewModel.onIntent(PlayerIntent.ToggleOptimization)
-
-        viewModel.onIntent(PlayerIntent.NextStream)
-
-        assertEquals(PlayerConfig(tunedBuffer = true), engine.startedConfigs.last())
-    }
+    // --- Topics and optimizations ---
 
     @Test
     fun `next and previous topic wrap around`() {
@@ -158,7 +145,7 @@ class PlayerViewModelTest {
 
     @Test
     fun `toggle on a topic without optimization does nothing`() {
-        viewModel.onIntent(PlayerIntent.ToggleOptimization) // topic 0: HLS basics
+        viewModel.onIntent(PlayerIntent.ToggleOptimization) // topic 0: playback basics
 
         assertEquals(PlayerConfig(), viewModel.state.value.config)
         assertEquals(1, engine.startedConfigs.size)
@@ -179,11 +166,11 @@ class PlayerViewModelTest {
     @Test
     fun `optimizations combine across topics`() {
         goToTopic(Topics.all.indexOf(Topics.abr))
-        viewModel.onIntent(PlayerIntent.ToggleOptimization)
+        viewModel.onIntent(PlayerIntent.ToggleOptimization) // ABR data saver on
         viewModel.onIntent(PlayerIntent.NextTopic) // network
-        viewModel.onIntent(PlayerIntent.ToggleOptimization)
+        viewModel.onIntent(PlayerIntent.ToggleOptimization) // OkHttp off -> platform stack
 
-        assertEquals(PlayerConfig(dataSaverAbr = true, okHttpNetwork = true), engine.startedConfigs.last())
+        assertEquals(PlayerConfig(dataSaverAbr = true, okHttpNetwork = false), engine.startedConfigs.last())
     }
 
     @Test
@@ -191,10 +178,10 @@ class PlayerViewModelTest {
         goToTopic(Topics.all.indexOf(Topics.network))
 
         viewModel.effects.test {
-            viewModel.onIntent(PlayerIntent.ToggleOptimization)
+            viewModel.onIntent(PlayerIntent.ToggleOptimization) // OkHttp (default) -> platform
 
             val message = (awaitItem() as PlayerEffect.ShowMessage).message
-            assertTrue(message.contains(Topics.network.optimization!!.optimizedLabel))
+            assertTrue(message.contains(Topics.network.optimization!!.defaultLabel))
         }
     }
 

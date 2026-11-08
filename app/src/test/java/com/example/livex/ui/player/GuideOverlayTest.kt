@@ -94,14 +94,11 @@ class GuideOverlayTest {
     }
 
     @Test
-    fun showsCurrentVideo_andVideoButtonsSendIntents() {
-        setContent(PlayerState())
+    fun showsCurrentVideoTitleAndFormat() {
+        setContent(PlayerState(stream = SampleStreams.dashIfLivesim))
 
-        composeRule.onNodeWithText(SampleStreams.all.first().title).assertIsDisplayed()
-        composeRule.onNodeWithText("Video ▶").performDpadClick()
-        composeRule.onNodeWithText("◀ Video").performDpadClick()
-
-        assertEquals(listOf(PlayerIntent.NextStream, PlayerIntent.PreviousStream), sentIntents)
+        composeRule.onNodeWithText(SampleStreams.dashIfLivesim.title).assertIsDisplayed()
+        composeRule.onNodeWithText("DASH · Live").assertIsDisplayed()
     }
 
     @Test

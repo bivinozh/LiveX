@@ -2,7 +2,7 @@ package com.example.livex.feature.home
 
 import androidx.lifecycle.viewModelScope
 import com.example.livex.core.mvi.MviViewModel
-import com.example.livex.data.greeting.GreetingRepository
+import com.example.livex.data.stream.StreamRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -10,9 +10,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val greetingRepository: GreetingRepository,
-) :
-    MviViewModel<HomeState, HomeIntent, HomeEffect>(HomeState()) {
+    private val streamRepository: StreamRepository,
+) : MviViewModel<HomeState, HomeIntent, HomeEffect>(HomeState()) {
 
     init {
         onIntent(HomeIntent.Load)
@@ -21,8 +20,8 @@ class HomeViewModel @Inject constructor(
     override fun handleIntent(intent: HomeIntent) {
         when (intent) {
             HomeIntent.Load, HomeIntent.Retry -> load()
-            HomeIntent.GreetingClicked ->
-                sendEffect(HomeEffect.ShowMessage("Welcome to LiveX!"))
+            // Navigation is a one-off event: the screen performs it, the ViewModel only requests it.
+            is HomeIntent.StreamClicked -> sendEffect(HomeEffect.NavigateToPlayer(intent.streamId))
         }
     }
 
@@ -31,8 +30,8 @@ class HomeViewModel @Inject constructor(
         setState { copy(isLoading = true, error = null) }
         viewModelScope.launch {
             try {
-                val greeting = greetingRepository.getGreeting()
-                setState { copy(isLoading = false, greeting = greeting) }
+                val streams = streamRepository.getStreams()
+                setState { copy(isLoading = false, streams = streams) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
