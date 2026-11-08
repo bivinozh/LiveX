@@ -1,5 +1,6 @@
 package com.example.livex.player
 
+import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.example.livex.data.SampleStreams
 import com.example.livex.data.Topics
@@ -9,6 +10,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -20,13 +22,96 @@ class PlayerViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private lateinit var engine: FakePlaybackEngine
+    private lateinit var savedState: SavedStateHandle
     private lateinit var viewModel: PlayerViewModel
 
     @Before
     fun setUp() {
         engine = FakePlaybackEngine()
-        viewModel = PlayerViewModel(engine)
+        savedState = SavedStateHandle()
+        viewModel = PlayerViewModel(engine, savedState)
     }
+
+    /** Simulates a new ViewModel after process death, restored from [saved]. */
+    private fun recreate(saved: Map<String, Any?>): PlayerViewModel {
+        engine = FakePlaybackEngine()
+        return PlayerViewModel(engine, SavedStateHandle(saved))
+    }
+
+    // --- Lifecycle ---
+
+    @Test
+    fun `app stop pauses playback`() {
+        viewModel.onIntent(PlayerIntent.LifecycleStop)
+
+        assertEquals(1, engine.pauseCount)
+    }
+
+    @Test
+    fun `app start resumes playback`() {
+        viewModel.onIntent(PlayerIntent.LifecycleStop)
+        viewModel.onIntent(PlayerIntent.LifecycleStart)
+
+        assertEquals(1, engine.resumeCount)
+    }
+
+    @Test
+    fun `app stop saves position stream and optimizations`() {
+        viewModel.onIntent(PlayerIntent.NextStream)
+        goToTopic(Topics.all.indexOf(Topics.bufferTuning))
+        viewModel.onIntent(PlayerIntent.ToggleOptimization)
+        engine.currentPositionMs = 42_000
+
+        viewModel.onIntent(PlayerIntent.LifecycleStop)
+
+        assertEquals(42_000L, savedState.get<Long>(PlayerViewModel.KEY_POSITION_MS))
+        assertEquals(1, savedState.get<Int>(PlayerViewModel.KEY_STREAM_INDEX))
+        assertEquals(true, savedState.get<Boolean>(PlayerViewModel.KEY_TUNED_BUFFER))
+    }
+
+    @Test
+    fun `fresh start has no start position`() {
+        assertNull(engine.startPositions.single())
+    }
+
+    @Test
+    fun `restores stream position and optimizations after process death`() {
+        val restored = recreate(
+            mapOf(
+                PlayerViewModel.KEY_STREAM_INDEX to 1,
+                PlayerViewModel.KEY_POSITION_MS to 42_000L,
+                PlayerViewModel.KEY_TUNED_BUFFER to true,
+            ),
+        )
+
+        assertEquals(1, restored.state.value.streamIndex)
+        assertEquals(SampleStreams.all[1], engine.startedStreams.single())
+        assertEquals(42_000L, engine.startPositions.single())
+        assertEquals(PlayerConfig(tunedBuffer = true), engine.startedConfigs.single())
+    }
+
+    @Test
+    fun `live stream is not restored to an old position`() {
+        val liveIndex = SampleStreams.all.indexOfFirst { it.isLive }
+
+        recreate(
+            mapOf(
+                PlayerViewModel.KEY_STREAM_INDEX to liveIndex,
+                PlayerViewModel.KEY_POSITION_MS to 42_000L,
+            ),
+        )
+
+        assertNull(engine.startPositions.single())
+    }
+
+    @Test
+    fun `out of range saved stream index falls back to first video`() {
+        val restored = recreate(mapOf(PlayerViewModel.KEY_STREAM_INDEX to 99))
+
+        assertEquals(0, restored.state.value.streamIndex)
+    }
+
+    // --- Topics, streams, optimizations ---
 
     private fun goToTopic(index: Int) = repeat(index) { viewModel.onIntent(PlayerIntent.NextTopic) }
 

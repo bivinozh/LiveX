@@ -42,9 +42,12 @@ class ExoPlaybackEngine @Inject constructor(
     private val tracker = QoeTracker()
 
     private var currentStream: Stream? = null
+    private var resumeOnStart = false
     private val _player = MutableStateFlow<ExoPlayer?>(null)
     override val player: StateFlow<Player?> = _player.asStateFlow()
     override val metrics: StateFlow<QoeMetrics> = tracker.metrics
+    override val currentPositionMs: Long
+        get() = _player.value?.currentPosition ?: 0L
 
     init {
         // Buffered duration isn't an event, so sample it.
@@ -57,10 +60,11 @@ class ExoPlaybackEngine @Inject constructor(
         }
     }
 
-    override fun start(stream: Stream, config: PlayerConfig) {
-        // Resume only when rebuilding the same VOD (optimization switch). A new stream starts from
-        // the beginning, and live always joins at the default live position.
-        val resumePositionMs = _player.value?.currentPosition
+    override fun start(stream: Stream, config: PlayerConfig, startPositionMs: Long?) {
+        // An explicit position wins (restore after process death). Otherwise resume only when
+        // rebuilding the same VOD (optimization switch); a new stream starts from the beginning,
+        // and live always joins at the default live position.
+        val resumePositionMs = startPositionMs ?: _player.value?.currentPosition
             ?.takeIf { stream == currentStream && !stream.isLive }
         currentStream = stream
         releasePlayer()
@@ -82,6 +86,19 @@ class ExoPlaybackEngine @Inject constructor(
         newPlayer.playWhenReady = true
 
         _player.value = newPlayer
+    }
+
+    override fun pause() {
+        val current = _player.value ?: return
+        resumeOnStart = current.playWhenReady
+        // pause() == playWhenReady = false: decoders, buffer and the media session stay allocated,
+        // so resuming is instant. Loading continues until the buffer target is reached.
+        current.pause()
+    }
+
+    override fun resume() {
+        if (resumeOnStart) _player.value?.play()
+        resumeOnStart = false
     }
 
     override fun release() {

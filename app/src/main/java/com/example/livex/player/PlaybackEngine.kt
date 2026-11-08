@@ -16,8 +16,22 @@ interface PlaybackEngine {
     /** Live QoE numbers for the current player instance. */
     val metrics: StateFlow<QoeMetrics>
 
-    /** (Re)builds the player with [config] and plays [stream], continuing from the current position. */
-    fun start(stream: Stream, config: PlayerConfig)
+    /** Current playback position of the current item, or 0 if nothing is loaded. */
+    val currentPositionMs: Long
 
+    /**
+     * (Re)builds the player with [config] and plays [stream].
+     * @param startPositionMs explicit position (e.g. restored after process death). When null,
+     * the same VOD resumes where it was, a new stream starts at 0, and live joins the live edge.
+     */
+    fun start(stream: Stream, config: PlayerConfig, startPositionMs: Long? = null)
+
+    /** Pauses playback (keeps decoders and buffer) and remembers whether to resume. */
+    fun pause()
+
+    /** Resumes playback only if it was playing when [pause] was called. */
+    fun resume()
+
+    /** Frees the player completely; the engine can't be used afterwards. */
     fun release()
 }
