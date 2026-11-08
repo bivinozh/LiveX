@@ -31,6 +31,12 @@ sealed interface PlayerIntent : UiIntent {
     data object PreviousStream : PlayerIntent
     data object ToggleOptimization : PlayerIntent
     data object ToggleGuide : PlayerIntent
+
+    /** App came to the foreground (Lifecycle ON_START). */
+    data object LifecycleStart : PlayerIntent
+
+    /** App went to the background (Lifecycle ON_STOP). */
+    data object LifecycleStop : PlayerIntent
 }
 
 sealed interface PlayerEffect : UiEffect {

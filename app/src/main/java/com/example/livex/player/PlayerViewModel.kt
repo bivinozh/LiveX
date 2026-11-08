@@ -1,5 +1,6 @@
 package com.example.livex.player
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.Player
 import com.example.livex.core.mvi.MviViewModel
@@ -12,10 +13,15 @@ import javax.inject.Inject
 /**
  * The player itself lives in [PlaybackEngine], which this ViewModel owns, so playback
  * survives configuration changes such as rotation; only the PlayerView is recreated.
+ *
+ * [SavedStateHandle] covers the case the ViewModel does NOT survive: the system killing the
+ * app process while it is in the background. The position is written on ON_STOP and read back
+ * in init when the app is reopened.
  */
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     private val engine: PlaybackEngine,
+    private val savedState: SavedStateHandle,
 ) : MviViewModel<PlayerState, PlayerIntent, PlayerEffect>(PlayerState()) {
 
     /** Separate from [state]: a Player is a live object, not immutable UI data. */
@@ -25,7 +31,11 @@ class PlayerViewModel @Inject constructor(
         engine.metrics
             .onEach { metrics -> setState { copy(metrics = metrics) } }
             .launchIn(viewModelScope)
-        engine.start(currentState.stream, currentState.config)
+
+        restoreSavedState()
+        val restoredPositionMs = savedState.get<Long>(KEY_POSITION_MS)
+            ?.takeUnless { currentState.stream.isLive } // live: always join at the live edge
+        engine.start(currentState.stream, currentState.config, restoredPositionMs)
     }
 
     override fun handleIntent(intent: PlayerIntent) {
@@ -40,6 +50,11 @@ class PlayerViewModel @Inject constructor(
             PlayerIntent.PreviousStream -> switchStream(step = -1)
             PlayerIntent.ToggleGuide -> setState { copy(isGuideVisible = !isGuideVisible) }
             PlayerIntent.ToggleOptimization -> toggleOptimization()
+            PlayerIntent.LifecycleStart -> engine.resume()
+            PlayerIntent.LifecycleStop -> {
+                engine.pause()
+                saveState()
+            }
         }
     }
 
@@ -65,7 +80,37 @@ class PlayerViewModel @Inject constructor(
         sendEffect(PlayerEffect.ShowMessage("Player restarted. $label"))
     }
 
+    private fun saveState() {
+        savedState[KEY_POSITION_MS] = engine.currentPositionMs
+        savedState[KEY_STREAM_INDEX] = currentState.streamIndex
+        savedState[KEY_TUNED_BUFFER] = currentState.config.tunedBuffer
+        savedState[KEY_DATA_SAVER_ABR] = currentState.config.dataSaverAbr
+        savedState[KEY_OKHTTP_NETWORK] = currentState.config.okHttpNetwork
+    }
+
+    private fun restoreSavedState() {
+        setState {
+            copy(
+                streamIndex = savedState.get<Int>(KEY_STREAM_INDEX)?.takeIf { it in streams.indices } ?: 0,
+                config = PlayerConfig(
+                    tunedBuffer = savedState.get<Boolean>(KEY_TUNED_BUFFER) ?: false,
+                    dataSaverAbr = savedState.get<Boolean>(KEY_DATA_SAVER_ABR) ?: false,
+                    okHttpNetwork = savedState.get<Boolean>(KEY_OKHTTP_NETWORK) ?: false,
+                ),
+            )
+        }
+    }
+
     override fun onCleared() {
+        // The screen is gone for good: free decoders, buffers, network and the wake lock.
         engine.release()
+    }
+
+    companion object {
+        const val KEY_POSITION_MS = "player.positionMs"
+        const val KEY_STREAM_INDEX = "player.streamIndex"
+        const val KEY_TUNED_BUFFER = "player.tunedBuffer"
+        const val KEY_DATA_SAVER_ABR = "player.dataSaverAbr"
+        const val KEY_OKHTTP_NETWORK = "player.okHttpNetwork"
     }
 }

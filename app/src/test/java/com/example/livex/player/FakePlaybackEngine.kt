@@ -10,15 +10,30 @@ import kotlinx.coroutines.flow.StateFlow
 class FakePlaybackEngine : PlaybackEngine {
     override val player: StateFlow<Player?> = MutableStateFlow(null)
     override val metrics = MutableStateFlow(QoeMetrics())
+    override var currentPositionMs: Long = 0
 
     val startedConfigs = mutableListOf<PlayerConfig>()
     val startedStreams = mutableListOf<Stream>()
+    val startPositions = mutableListOf<Long?>()
+    var pauseCount = 0
+        private set
+    var resumeCount = 0
+        private set
     var released = false
         private set
 
-    override fun start(stream: Stream, config: PlayerConfig) {
+    override fun start(stream: Stream, config: PlayerConfig, startPositionMs: Long?) {
         startedConfigs += config
         startedStreams += stream
+        startPositions += startPositionMs
+    }
+
+    override fun pause() {
+        pauseCount++
+    }
+
+    override fun resume() {
+        resumeCount++
     }
 
     override fun release() {
