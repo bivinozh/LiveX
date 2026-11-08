@@ -28,11 +28,13 @@ object Topics {
         "start after ${bufferForPlaybackMs} ms, keep ${minBufferMs / 1000}–${maxBufferMs / 1000} s buffered"
 
     val hlsBasics = Topic(
-        title = "HLS playback basics",
-        description = "ExoPlayer downloads the HLS master playlist, picks a quality variant, " +
+        title = "HLS & DASH playback basics",
+        description = "ExoPlayer downloads the HLS playlist or DASH manifest, picks a quality, " +
             "then fetches short media segments into a buffer and plays them.",
         guidance = listOf(
-            "MediaItem describes WHAT to play: the URL plus the HLS MIME type.",
+            "MediaItem describes WHAT to play: the URL plus the MIME type (M3U8 = HLS, MPD = DASH).",
+            "DefaultMediaSourceFactory uses that MIME type to choose HlsMediaSource or DashMediaSource.",
+            "Live streams (HLS live, DASH dynamic MPD) join at the live edge and keep refreshing the manifest.",
             "setMediaItem → prepare → playWhenReady = true starts loading and playback.",
             "The player lives in the ViewModel, so it survives configuration changes.",
             "release() in onCleared frees decoders, memory and network connections.",
@@ -83,12 +85,13 @@ object Topics {
 
     val network = Topic(
         title = "Network: OkHttp data source",
-        description = "Every playlist and segment is an HTTP request. The data source controls " +
-            "connections, caching and request headers.",
+        description = "Every playlist, manifest and segment is an HTTP request. The data source " +
+            "controls connections, caching and request headers.",
         guidance = listOf(
-            "Default uses DefaultHttpDataSource (the platform HttpURLConnection).",
-            "Optimized uses OkHttpDataSource with one shared OkHttpClient: connection pooling, " +
+            "ON (default): OkHttpDataSource with one shared OkHttpClient: connection pooling, " +
                 "HTTP/2 and a 50 MB disk cache that outlive player restarts.",
+            "OFF: DefaultHttpDataSource (the platform HttpURLConnection), for comparison.",
+            "Both send a custom User-Agent (LiveX/<version> … AndroidXMedia3/<version>) so CDN logs show the app.",
             "Compare Avg request time; re-fetched segments may come from the disk cache if the CDN allows caching.",
             "OkHttp interceptors are also where auth tokens, headers and logging go.",
         ),
@@ -97,8 +100,8 @@ object Topics {
         ),
         optimization = Optimization(
             toggle = OptimizationToggle.NETWORK,
-            defaultLabel = "Default: DefaultHttpDataSource",
-            optimizedLabel = "Optimized: OkHttpDataSource (shared client + cache)",
+            defaultLabel = "Platform: DefaultHttpDataSource",
+            optimizedLabel = "OkHttpDataSource (shared client + cache)",
             tradeOff = "Adds the OkHttp dependency; gains depend on the CDN and network.",
         ),
     )

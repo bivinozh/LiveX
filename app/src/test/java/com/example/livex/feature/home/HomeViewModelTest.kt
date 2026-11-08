@@ -1,7 +1,8 @@
 package com.example.livex.feature.home
 
 import app.cash.turbine.test
-import com.example.livex.data.greeting.FakeGreetingRepository
+import com.example.livex.data.SampleStreams
+import com.example.livex.data.stream.FakeStreamRepository
 import com.example.livex.testutil.MainDispatcherRule
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -17,11 +18,11 @@ class HomeViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private lateinit var repository: FakeGreetingRepository
+    private lateinit var repository: FakeStreamRepository
 
     @Before
     fun setUp() {
-        repository = FakeGreetingRepository()
+        repository = FakeStreamRepository()
     }
 
     private fun createViewModel() = HomeViewModel(repository)
@@ -34,13 +35,12 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `shows greeting when load succeeds`() = runTest {
-        repository.greeting = "Hello TDD!"
+    fun `shows streams when load succeeds`() = runTest {
         val viewModel = createViewModel()
 
         advanceUntilIdle()
 
-        assertEquals(HomeState(greeting = "Hello TDD!"), viewModel.state.value)
+        assertEquals(HomeState(streams = SampleStreams.all), viewModel.state.value)
     }
 
     @Test
@@ -64,7 +64,7 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `retry after failure clears error and shows greeting`() = runTest {
+    fun `retry after failure clears error and shows streams`() = runTest {
         repository.error = IOException("No network")
         val viewModel = createViewModel()
         advanceUntilIdle()
@@ -73,7 +73,7 @@ class HomeViewModelTest {
         viewModel.onIntent(HomeIntent.Retry)
         advanceUntilIdle()
 
-        assertEquals(HomeState(greeting = "Hello Test!"), viewModel.state.value)
+        assertEquals(HomeState(streams = SampleStreams.all), viewModel.state.value)
         assertEquals(2, repository.callCount)
     }
 
@@ -88,14 +88,14 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `greeting click emits welcome message effect`() = runTest {
+    fun `stream click emits navigate to player with the stream id`() = runTest {
         val viewModel = createViewModel()
         advanceUntilIdle()
 
         viewModel.effects.test {
-            viewModel.onIntent(HomeIntent.GreetingClicked)
+            viewModel.onIntent(HomeIntent.StreamClicked(SampleStreams.dashIfLivesim.id))
 
-            assertEquals(HomeEffect.ShowMessage("Welcome to LiveX!"), awaitItem())
+            assertEquals(HomeEffect.NavigateToPlayer(SampleStreams.dashIfLivesim.id), awaitItem())
         }
     }
 }

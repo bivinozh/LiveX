@@ -6,6 +6,7 @@ import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.common.util.Util
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
@@ -40,6 +41,9 @@ class ExoPlaybackEngine @Inject constructor(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val tracker = QoeTracker()
+
+    /** e.g. "LiveX/1.0 (Linux;Android 16) AndroidXMedia3/1.11.1": identifies the app to CDNs and in server logs. */
+    private val userAgent: String = Util.getUserAgent(context, USER_AGENT_APP_NAME)
 
     private var currentStream: Stream? = null
     private var resumeOnStart = false
@@ -126,15 +130,24 @@ class ExoPlaybackEngine @Inject constructor(
             )
             .build()
 
-        // Topic: Network
+        // Topic: Network. Every HTTP request (playlists, manifests, segments) goes through this factory.
         val httpFactory: DataSource.Factory =
-            if (config.okHttpNetwork) OkHttpDataSource.Factory(okHttpClient)
-            else DefaultHttpDataSource.Factory()
+            if (config.okHttpNetwork) {
+                OkHttpDataSource.Factory(okHttpClient).setUserAgent(userAgent)
+            } else {
+                DefaultHttpDataSource.Factory().setUserAgent(userAgent)
+            }
+        // DefaultDataSource adds support for non-HTTP URIs (file://, asset://, content://) on top.
         val dataSourceFactory = DefaultDataSource.Factory(context, httpFactory)
+
+        // DefaultMediaSourceFactory picks HlsMediaSource / DashMediaSource / ProgressiveMediaSource
+        // per MediaItem (from its MIME type, else the URI extension); all of them load through our factory.
+        val mediaSourceFactory = DefaultMediaSourceFactory(context)
+            .setDataSourceFactory(dataSourceFactory)
 
         val player = ExoPlayer.Builder(context)
             .setLoadControl(loadControl)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
+            .setMediaSourceFactory(mediaSourceFactory)
             .build()
 
         // Topic: ABR
@@ -144,5 +157,9 @@ class ExoPlaybackEngine @Inject constructor(
                 .build()
         }
         return player
+    }
+
+    private companion object {
+        const val USER_AGENT_APP_NAME = "LiveX"
     }
 }

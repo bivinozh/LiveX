@@ -10,15 +10,14 @@ import com.example.livex.data.Topics
 import com.example.livex.qoe.QoeMetrics
 
 data class PlayerState(
-    val streams: List<Stream> = SampleStreams.all,
-    val streamIndex: Int = 0,
+    /** The stream chosen on the Home screen (navigation argument). */
+    val stream: Stream = SampleStreams.all.first(),
     val topics: List<Topic> = Topics.all,
     val topicIndex: Int = 0,
     val config: PlayerConfig = PlayerConfig(),
     val metrics: QoeMetrics = QoeMetrics(),
     val isGuideVisible: Boolean = true,
 ) : UiState {
-    val stream: Stream get() = streams[streamIndex]
     val topic: Topic get() = topics[topicIndex]
     val isOptimizationEnabled: Boolean
         get() = topic.optimization?.let { config.isEnabled(it.toggle) } ?: false
@@ -27,8 +26,6 @@ data class PlayerState(
 sealed interface PlayerIntent : UiIntent {
     data object NextTopic : PlayerIntent
     data object PreviousTopic : PlayerIntent
-    data object NextStream : PlayerIntent
-    data object PreviousStream : PlayerIntent
     data object ToggleOptimization : PlayerIntent
     data object ToggleGuide : PlayerIntent
 

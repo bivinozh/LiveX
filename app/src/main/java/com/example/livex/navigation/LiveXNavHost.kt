@@ -1,0 +1,34 @@
+package com.example.livex.navigation
+
+import androidx.compose.runtime.Composable
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.example.livex.feature.home.HomeScreen
+import com.example.livex.ui.player.PlayerScreen
+import kotlinx.serialization.Serializable
+
+@Serializable
+data object HomeRoute
+
+/**
+ * Navigation passes [streamId] to the player destination. Navigation also puts it into that
+ * destination's SavedStateHandle under the property name "streamId" (see PlayerViewModel.KEY_STREAM_ID).
+ */
+@Serializable
+data class PlayerRoute(val streamId: String)
+
+@Composable
+fun LiveXNavHost(navController: NavHostController = rememberNavController()) {
+    NavHost(navController = navController, startDestination = HomeRoute) {
+        composable<HomeRoute> {
+            HomeScreen(onStreamSelected = { streamId -> navController.navigate(PlayerRoute(streamId)) })
+        }
+        // Each destination gets its own ViewModelStore: leaving the player (Back) clears
+        // PlayerViewModel, whose onCleared() releases the ExoPlayer.
+        composable<PlayerRoute> {
+            PlayerScreen()
+        }
+    }
+}

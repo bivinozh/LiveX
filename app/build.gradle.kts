@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
 }
@@ -81,6 +82,9 @@ dependencies {
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.datasource.okhttp)
     implementation(libs.okhttp)
+
+    // Navigation (type-safe routes use kotlinx.serialization)
+    implementation(libs.androidx.navigation.compose)
 
     // Local tests (JVM + Robolectric)
     testImplementation(libs.junit)

@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.example.livex.data.SampleStreams
 import com.example.livex.testutil.performDpadClick
 import com.example.livex.ui.theme.LiveXTheme
 import org.junit.Assert.assertEquals
@@ -36,12 +37,22 @@ class HomeContentTest {
     }
 
     @Test
-    fun loadedState_showsGreeting_andClickSendsGreetingClicked() {
-        setContent(HomeState(greeting = "Hello TDD!"))
+    fun loadedState_listsStreamsWithFormatAndLiveLabel() {
+        setContent(HomeState(streams = listOf(SampleStreams.bigBuckBunny, SampleStreams.dashIfLivesim)))
 
-        composeRule.onNodeWithText("Hello TDD!").assertIsDisplayed().performDpadClick()
+        composeRule.onNodeWithText(SampleStreams.bigBuckBunny.title, substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("HLS · VOD", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText(SampleStreams.dashIfLivesim.title, substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("DASH · Live", substring = true).assertIsDisplayed()
+    }
 
-        assertEquals(listOf<HomeIntent>(HomeIntent.GreetingClicked), sentIntents)
+    @Test
+    fun clickingAStream_sendsStreamClickedWithItsId() {
+        setContent(HomeState(streams = SampleStreams.all))
+
+        composeRule.onNodeWithText(SampleStreams.tearsOfSteelDash.title, substring = true).performDpadClick()
+
+        assertEquals(listOf<HomeIntent>(HomeIntent.StreamClicked(SampleStreams.tearsOfSteelDash.id)), sentIntents)
     }
 
     @Test

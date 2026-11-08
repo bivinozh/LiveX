@@ -73,7 +73,7 @@ private fun GuidePanel(state: PlayerState, onIntent: (PlayerIntent) -> Unit, mod
             .padding(horizontal = 24.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        VideoSelector(state, onIntent)
+        VideoInfo(state)
 
         Text(
             "Topic ${state.topicIndex + 1} / ${state.topics.size}",
@@ -104,19 +104,11 @@ private fun GuidePanel(state: PlayerState, onIntent: (PlayerIntent) -> Unit, mod
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
+/** Which stream is playing. To change it, press Back and pick another one from the list. */
 @Composable
-private fun VideoSelector(state: PlayerState, onIntent: (PlayerIntent) -> Unit) {
-    Text(
-        "Video ${state.streamIndex + 1} / ${state.streams.size} · ${state.stream.formatLabel}",
-        style = MaterialTheme.typography.labelMedium,
-        color = Muted,
-    )
+private fun VideoInfo(state: PlayerState) {
+    Text(state.stream.formatLabel, style = MaterialTheme.typography.labelMedium, color = Muted)
     Text(state.stream.title, style = MaterialTheme.typography.titleMedium, color = Color.White)
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = { onIntent(PlayerIntent.PreviousStream) }) { Text("◀ Video") }
-        Button(onClick = { onIntent(PlayerIntent.NextStream) }) { Text("Video ▶") }
-    }
     Spacer(Modifier.height(4.dp))
 }
 

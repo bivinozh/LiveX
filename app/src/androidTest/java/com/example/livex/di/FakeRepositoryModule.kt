@@ -1,13 +1,21 @@
 package com.example.livex.di
 
-import com.example.livex.data.greeting.GreetingRepository
+import androidx.media3.common.MimeTypes
+import com.example.livex.data.Stream
+import com.example.livex.data.stream.StreamRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.components.SingletonComponent
 import dagger.hilt.testing.TestInstallIn
 import javax.inject.Singleton
 
-const val FAKE_GREETING = "Hello from fake!"
+val FAKE_STREAM = Stream(
+    id = "fake",
+    title = "Fake stream from test module",
+    url = "https://example.invalid/fake.m3u8",
+    mimeType = MimeTypes.APPLICATION_M3U8,
+    isLive = false,
+)
 
 /** Replaces [RepositoryModule] in every instrumented test with fast, deterministic fakes. */
 @Module
@@ -16,7 +24,7 @@ object FakeRepositoryModule {
 
     @Provides
     @Singleton
-    fun provideGreetingRepository(): GreetingRepository = object : GreetingRepository {
-        override suspend fun getGreeting() = FAKE_GREETING
+    fun provideStreamRepository(): StreamRepository = object : StreamRepository {
+        override suspend fun getStreams() = listOf(FAKE_STREAM)
     }
 }
