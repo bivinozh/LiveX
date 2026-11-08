@@ -2,12 +2,16 @@ package com.example.livex.feature.home
 
 import androidx.lifecycle.viewModelScope
 import com.example.livex.core.mvi.MviViewModel
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
 
-class HomeViewModel : MviViewModel<HomeState, HomeIntent, HomeEffect>(HomeState()) {
+@HiltViewModel
+class HomeViewModel @Inject constructor() :
+    MviViewModel<HomeState, HomeIntent, HomeEffect>(HomeState()) {
 
     init {
         onIntent(HomeIntent.Load)
