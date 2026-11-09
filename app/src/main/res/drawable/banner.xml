@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android TV launcher banner (320x180dp, 16:9). TV home screens show this instead of the square
+  icon, and Google's guidelines ask for the app name to be visible on it.
+  "LIVEX" is drawn with stroked paths (vectors have no text), which works because every letter is
+  made of straight lines.
+-->
+<!-- VectorRaster: 320dp exceeds the 200dp guideline, but the launcher draws the banner once and caches it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="VectorRaster"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+
+    <!-- Background -->
+    <path
+        android:fillColor="@color/livex_dark"
+        android:pathData="M0,0 H320 V180 H0 Z" />
+
+    <!-- Mark: red "live" circle (center 70,90, r 38) with a thin outer ring -->
+    <path
+        android:fillColor="@color/livex_red"
+        android:pathData="M32,90 A38,38 0 1 1 108,90 A38,38 0 1 1 32,90 Z" />
+    <path
+        android:strokeColor="@color/livex_red"
+        android:strokeWidth="2"
+        android:strokeAlpha="0.5"
+        android:pathData="M25,90 A45,45 0 1 1 115,90 A45,45 0 1 1 25,90 Z" />
+
+    <!-- Mark: white play triangle (centroid on the circle center) -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineJoin="round"
+        android:pathData="M62,74 L86,90 L62,106 Z" />
+
+    <!-- "LIVE" -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="9"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M130,64 V116 H154 M166,64 V116 M178,64 L193,116 L208,64 M244,64 H220 V116 H244 M220,90 H240" />
+
+    <!-- "X" in the brand red -->
+    <path
+        android:strokeColor="@color/livex_red"
+        android:strokeWidth="9"
+        android:strokeLineCap="round"
+        android:pathData="M256,64 L286,116 M286,64 L256,116" />
+</vector>

@@ -21,7 +21,10 @@ class HomeViewModel @Inject constructor(
         when (intent) {
             HomeIntent.Load, HomeIntent.Retry -> load()
             // Navigation is a one-off event: the screen performs it, the ViewModel only requests it.
-            is HomeIntent.StreamClicked -> sendEffect(HomeEffect.NavigateToPlayer(intent.streamId))
+            is HomeIntent.StreamClicked -> {
+                setState { copy(selectedStreamId = intent.streamId) }
+                sendEffect(HomeEffect.NavigateToPlayer(intent.streamId))
+            }
         }
     }
 

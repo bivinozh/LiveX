@@ -1,6 +1,8 @@
 package com.example.livex.feature.home
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -53,6 +55,28 @@ class HomeContentTest {
         composeRule.onNodeWithText(SampleStreams.tearsOfSteelDash.title, substring = true).performDpadClick()
 
         assertEquals(listOf<HomeIntent>(HomeIntent.StreamClicked(SampleStreams.tearsOfSteelDash.id)), sentIntents)
+    }
+
+    @Test
+    fun noSelection_focusesFirstStream() {
+        setContent(HomeState(streams = SampleStreams.all))
+
+        composeRule.onNodeWithText(SampleStreams.all.first().title, substring = true).assertIsFocused()
+    }
+
+    @Test
+    fun returningWithSelection_restoresFocusOnThatStream() {
+        setContent(HomeState(streams = SampleStreams.all, selectedStreamId = SampleStreams.liveHls.id))
+
+        composeRule.onNodeWithText(SampleStreams.liveHls.title, substring = true).assertIsFocused()
+        composeRule.onNodeWithText(SampleStreams.all.first().title, substring = true).assertIsNotFocused()
+    }
+
+    @Test
+    fun unknownSelection_fallsBackToFirstStream() {
+        setContent(HomeState(streams = SampleStreams.all, selectedStreamId = "removed-stream"))
+
+        composeRule.onNodeWithText(SampleStreams.all.first().title, substring = true).assertIsFocused()
     }
 
     @Test

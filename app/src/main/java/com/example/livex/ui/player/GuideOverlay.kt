@@ -41,6 +41,9 @@ private val PanelBackground = Color.Black.copy(alpha = 0.8f)
 private val Accent = Color(0xFF80CBC4)
 private val Muted = Color(0xFFB0BEC5)
 
+/** Width of the guide panel on the right; the status overlay centers itself in the space left of it. */
+val GuidePanelWidth = 460.dp
+
 /** Stateless guide drawn on top of the video: topic description, guidance, optimization demo and live metrics. */
 @Composable
 fun GuideOverlay(
@@ -66,7 +69,7 @@ private fun GuidePanel(state: PlayerState, onIntent: (PlayerIntent) -> Unit, mod
 
     Column(
         modifier = modifier
-            .width(460.dp)
+            .width(GuidePanelWidth)
             .fillMaxHeight()
             .background(PanelBackground)
             .verticalScroll(rememberScrollState())

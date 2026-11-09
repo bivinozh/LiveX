@@ -3,12 +3,14 @@ package com.example.livex.ui.player
 import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -60,6 +62,13 @@ fun PlayerScreen(
         )
 
         GuideOverlay(state = state, onIntent = viewModel::onIntent)
+
+        // Drawn last so the error card sits above the guide; centered in the visible video area.
+        PlaybackStatusOverlay(
+            playback = state.playback,
+            onRetry = { viewModel.onIntent(PlayerIntent.Retry) },
+            modifier = Modifier.padding(end = if (state.isGuideVisible) GuidePanelWidth else 0.dp),
+        )
     }
 }
 

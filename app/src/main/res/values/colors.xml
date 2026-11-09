@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand colors shared by the launcher icon and the TV banner. -->
+    <color name="livex_red">#FFE53935</color>
+    <color name="livex_dark">#FF11141B</color>
+    <color name="ic_launcher_background">@color/livex_dark</color>
+</resources>

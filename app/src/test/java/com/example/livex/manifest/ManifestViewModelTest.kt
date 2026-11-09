@@ -20,7 +20,7 @@ class ManifestViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private val stream = SampleStreams.akamaiLive
+    private val stream = SampleStreams.liveHls
     private val variantUrl = stream.url.substringBeforeLast('/') + "/low/index.m3u8"
     private val master = """
         #EXTM3U

@@ -9,6 +9,11 @@ data class HomeState(
     val isLoading: Boolean = false,
     val streams: List<Stream> = emptyList(),
     val error: String? = null,
+    /**
+     * Last stream the user opened. The Home composable is disposed while the player is on screen,
+     * but this ViewModel lives in the back stack entry, so focus can return to this item on back.
+     */
+    val selectedStreamId: String? = null,
 ) : UiState
 
 sealed interface HomeIntent : UiIntent {

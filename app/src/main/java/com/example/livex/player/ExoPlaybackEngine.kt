@@ -104,6 +104,19 @@ class ExoPlaybackEngine @Inject constructor(
         resumeOnStart = false
     }
 
+    override fun retry() {
+        // After an error the player is IDLE. prepare() reloads from the current position;
+        // playWhenReady is unchanged, so it plays again as soon as it's READY.
+        _player.value?.prepare()
+    }
+
+    override fun rejoinLiveEdge() {
+        val current = _player.value ?: return
+        // The default position of a live window is its live edge (minus the target live offset).
+        current.seekToDefaultPosition()
+        current.prepare()
+    }
+
     override fun release() {
         scope.cancel()
         releasePlayer()

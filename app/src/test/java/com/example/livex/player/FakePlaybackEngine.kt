@@ -21,6 +21,18 @@ class FakePlaybackEngine : PlaybackEngine {
         private set
     var released = false
         private set
+    var retryCount = 0
+        private set
+    var rejoinLiveEdgeCount = 0
+        private set
+
+    override fun retry() {
+        retryCount++
+    }
+
+    override fun rejoinLiveEdge() {
+        rejoinLiveEdgeCount++
+    }
 
     override fun start(stream: Stream, config: PlayerConfig, startPositionMs: Long?) {
         startedConfigs += config

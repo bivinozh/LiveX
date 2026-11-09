@@ -7,6 +7,7 @@ import com.example.livex.testutil.MainDispatcherRule
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -97,5 +98,35 @@ class HomeViewModelTest {
 
             assertEquals(HomeEffect.NavigateToPlayer(SampleStreams.dashIfLivesim.id), awaitItem())
         }
+    }
+
+    @Test
+    fun `nothing is selected before the first click`() = runTest {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        assertNull(viewModel.state.value.selectedStreamId)
+    }
+
+    @Test
+    fun `stream click remembers the selection so focus can return to it after back`() = runTest {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.onIntent(HomeIntent.StreamClicked(SampleStreams.tearsOfSteelDash.id))
+
+        assertEquals(SampleStreams.tearsOfSteelDash.id, viewModel.state.value.selectedStreamId)
+    }
+
+    @Test
+    fun `retry keeps the remembered selection`() = runTest {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        viewModel.onIntent(HomeIntent.StreamClicked(SampleStreams.liveHls.id))
+
+        viewModel.onIntent(HomeIntent.Retry)
+        advanceUntilIdle()
+
+        assertEquals(SampleStreams.liveHls.id, viewModel.state.value.selectedStreamId)
     }
 }
