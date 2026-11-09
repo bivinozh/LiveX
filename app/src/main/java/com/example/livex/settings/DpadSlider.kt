@@ -35,15 +35,15 @@ import androidx.tv.material3.Text
 private val Accent = Color(0xFF80CBC4)
 private val Muted = Color(0xFFB0BEC5)
 
-fun sliderTag(field: SliderSpec) = "slider_${field.name}"
+fun sliderTag(field: BufferField) = "slider_${field.name}"
 
 /**
  * tv-material3 has no slider, so this is a focusable row the remote drives: Left/Right move one
- * [SliderSpec.step] (holding the key repeats). Up/Down are not consumed, so focus moves between rows.
+ * [BufferField.step] (holding the key repeats). Up/Down are not consumed, so focus moves between rows.
  */
 @Composable
 fun DpadSlider(
-    field: SliderSpec,
+    field: BufferField,
     valueMs: Int,
     onValueChange: (Int) -> Unit,
     onFocused: () -> Unit,

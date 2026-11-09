@@ -1,6 +1,5 @@
 package com.example.livex.player
 
-import com.example.livex.settings.AbrSettings
 import com.example.livex.settings.BufferSettings
 
 /** The optimizations that can be switched on/off from the guide overlay. */
@@ -17,8 +16,6 @@ data class PlayerConfig(
     val tunedBuffer: Boolean = false,
     /** The saved buffer settings (DataStore). Used when [tunedBuffer] is on. */
     val buffer: BufferSettings = BufferSettings.DEFAULT,
-    /** AdaptiveTrackSelection.Factory + initial bandwidth estimate (ABR settings screen). Always applied. */
-    val abr: AbrSettings = AbrSettings.MEDIA3_DEFAULT,
     val dataSaverAbr: Boolean = false,
     val okHttpNetwork: Boolean = true,
 ) {

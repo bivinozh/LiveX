@@ -8,7 +8,6 @@ import com.example.livex.data.Stream
 import com.example.livex.data.Topic
 import com.example.livex.data.Topics
 import com.example.livex.network.ThrottleMode
-import com.example.livex.player.abr.QualityState
 import com.example.livex.qoe.QoeMetrics
 
 data class PlayerState(
@@ -23,8 +22,6 @@ data class PlayerState(
     val isStatsVisible: Boolean = true,
     /** Network throttle simulator mode (applied at runtime, no player rebuild). */
     val throttleMode: ThrottleMode = ThrottleMode.UNLIMITED,
-    /** Quality picker: available heights (from Player.currentTracks) and the manual choice. */
-    val quality: QualityState = QualityState(),
     /** Player.Listener events mapped for the UI: spinner on Buffering, error card on Error. */
     val playback: PlayerUiState = PlayerUiState.Idle,
 ) : UiState {
@@ -43,12 +40,6 @@ sealed interface PlayerIntent : UiIntent {
 
     /** "Edit buffer settings" in the buffer topic. */
     data object OpenBufferSettings : PlayerIntent
-
-    /** "Edit ABR settings" in the ABR topic. */
-    data object OpenAbrSettings : PlayerIntent
-
-    /** Quality picker: a height, or null for Auto (ABR). */
-    data class SelectQuality(val height: Int?) : PlayerIntent
 
     /** Retry button on the error card. */
     data object Retry : PlayerIntent
@@ -70,5 +61,4 @@ sealed interface PlayerEffect : UiEffect {
     data class ShowMessage(val message: String) : PlayerEffect
     data class NavigateToManifest(val streamId: String) : PlayerEffect
     data object NavigateToBufferSettings : PlayerEffect
-    data object NavigateToAbrSettings : PlayerEffect
 }

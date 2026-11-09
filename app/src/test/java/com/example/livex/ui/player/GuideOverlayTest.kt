@@ -12,8 +12,6 @@ import com.example.livex.data.Topics
 import com.example.livex.player.PlayerConfig
 import com.example.livex.player.PlayerIntent
 import com.example.livex.player.PlayerState
-import com.example.livex.player.abr.QualityState
-import com.example.livex.player.abr.VideoQuality
 import com.example.livex.qoe.QoeMetrics
 import com.example.livex.qoe.StallStats
 import com.example.livex.testutil.performDpadClick
@@ -151,44 +149,6 @@ class GuideOverlayTest {
             listOf<PlayerIntent>(PlayerIntent.SeekBy(-10_000), PlayerIntent.SeekBy(60_000)),
             sentIntents,
         )
-    }
-
-    @Test
-    fun qualityPicker_listsAutoAndEachHeight_andSendsSelection() {
-        setContent(
-            PlayerState(
-                quality = QualityState(
-                    options = listOf(VideoQuality(720, 1280, 2_149_280, 0, 0), VideoQuality(480, 848, 836_280, 0, 3)),
-                ),
-            ),
-        )
-
-        composeRule.onNodeWithText("Quality: Auto ▾").performDpadClick()
-        composeRule.onNodeWithText("✓ Auto (ABR)").assertExists()
-        composeRule.onNodeWithText("720p · 2.15 Mbps").assertExists()
-        composeRule.onNodeWithText("480p · 0.84 Mbps").performDpadClick()
-
-        assertEquals(listOf<PlayerIntent>(PlayerIntent.SelectQuality(480)), sentIntents)
-    }
-
-    @Test
-    fun qualityPicker_headerShowsManualChoice() {
-        setContent(
-            PlayerState(
-                quality = QualityState(options = listOf(VideoQuality(480, 848, 836_280, 0, 3)), selectedHeight = 480),
-            ),
-        )
-
-        composeRule.onNodeWithText("Quality: 480p (manual) ▾").assertExists()
-    }
-
-    @Test
-    fun abrTopic_hasEditAbrSettingsButton() {
-        setContent(PlayerState(topicIndex = Topics.all.indexOf(Topics.abr)))
-
-        composeRule.onNodeWithText("Edit ABR settings").performDpadClick()
-
-        assertEquals(listOf<PlayerIntent>(PlayerIntent.OpenAbrSettings), sentIntents)
     }
 
     @Test

@@ -21,65 +21,17 @@ import androidx.tv.material3.Button
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
 import com.example.livex.network.ThrottleMode
-import com.example.livex.player.abr.QualityState
 
-/** Network throttle simulator mode picker. */
+/**
+ * D-pad friendly dropdown (tv-material3 has no menu component): a header button that expands an
+ * inline list of modes. Opening focuses the current mode; choosing one collapses and returns focus
+ * to the header, so the remote never loses its place.
+ */
+@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun NetworkDropdown(
     mode: ThrottleMode,
     onSelect: (ThrottleMode) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    TvDropdown(
-        header = "Network: ${mode.label}",
-        options = ThrottleMode.entries,
-        selected = mode,
-        optionLabel = { it.label },
-        onSelect = onSelect,
-        modifier = modifier,
-    )
-}
-
-/**
- * Quality picker: "Auto (ABR)" plus every available video height (from Player.currentTracks).
- * Auto shows what ABR is currently playing, e.g. "Quality: Auto (720p)".
- */
-@Composable
-fun QualityDropdown(
-    quality: QualityState,
-    playingHeight: Int?,
-    onSelect: (Int?) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val header = when (val selected = quality.selectedHeight) {
-        null -> "Quality: Auto" + (playingHeight?.takeIf { it > 0 }?.let { " (${it}p)" } ?: "")
-        else -> "Quality: ${selected}p (manual)"
-    }
-    TvDropdown(
-        header = header,
-        options = listOf<Int?>(null) + quality.options.map { it.height },
-        selected = quality.selectedHeight,
-        optionLabel = { height ->
-            if (height == null) "Auto (ABR)" else quality.options.first { it.height == height }.label
-        },
-        onSelect = onSelect,
-        modifier = modifier,
-    )
-}
-
-/**
- * D-pad friendly dropdown (tv-material3 has no menu component): a header button that expands an
- * inline list. Opening focuses the current option; choosing one collapses and returns focus to the
- * header, so the remote never loses its place.
- */
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-fun <T> TvDropdown(
-    header: String,
-    options: List<T>,
-    selected: T,
-    optionLabel: (T) -> String,
-    onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
@@ -98,7 +50,7 @@ fun <T> TvDropdown(
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Button(onClick = { expanded = !expanded }, modifier = Modifier.focusRequester(headerFocus)) {
-            Text("$header ${if (expanded) "▴" else "▾"}")
+            Text("Network: ${mode.label} ${if (expanded) "▴" else "▾"}")
         }
         if (expanded) {
             Column(
@@ -107,8 +59,8 @@ fun <T> TvDropdown(
                     .padding(8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                options.forEach { option ->
-                    val isSelected = option == selected
+                ThrottleMode.entries.forEach { option ->
+                    val isSelected = option == mode
                     Button(
                         onClick = {
                             expanded = false
@@ -116,7 +68,7 @@ fun <T> TvDropdown(
                         },
                         modifier = if (isSelected) Modifier.focusRequester(selectedFocus) else Modifier,
                     ) {
-                        Text(if (isSelected) "✓ ${optionLabel(option)}" else optionLabel(option))
+                        Text(if (isSelected) "✓ ${option.label}" else option.label)
                     }
                 }
             }
