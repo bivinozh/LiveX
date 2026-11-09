@@ -195,6 +195,15 @@ class PlayerViewModelTest {
     }
 
     @Test
+    fun `open manifest requests navigation for the current stream`() = runTest {
+        viewModel.effects.test {
+            viewModel.onIntent(PlayerIntent.OpenManifest)
+
+            assertEquals(PlayerEffect.NavigateToManifest(SampleStreams.bigBuckBunny.id), awaitItem())
+        }
+    }
+
+    @Test
     fun `toggle guide hides and shows the overlay`() {
         viewModel.onIntent(PlayerIntent.ToggleGuide)
         assertFalse(viewModel.state.value.isGuideVisible)

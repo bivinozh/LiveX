@@ -1,5 +1,7 @@
 package com.example.livex.di
 
+import com.example.livex.data.manifest.ManifestRepository
+import com.example.livex.data.manifest.OkHttpManifestRepository
 import com.example.livex.data.stream.DefaultStreamRepository
 import com.example.livex.data.stream.StreamRepository
 import dagger.Binds
@@ -15,4 +17,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindStreamRepository(impl: DefaultStreamRepository): StreamRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindManifestRepository(impl: OkHttpManifestRepository): ManifestRepository
 }

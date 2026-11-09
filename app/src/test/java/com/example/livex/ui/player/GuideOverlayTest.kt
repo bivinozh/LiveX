@@ -102,6 +102,15 @@ class GuideOverlayTest {
     }
 
     @Test
+    fun viewManifestButtonSendsOpenManifest() {
+        setContent(PlayerState())
+
+        composeRule.onNodeWithText("View manifest").performDpadClick()
+
+        assertEquals(listOf<PlayerIntent>(PlayerIntent.OpenManifest), sentIntents)
+    }
+
+    @Test
     fun hiddenGuide_showsOnlyShowGuideButton() {
         setContent(PlayerState(isGuideVisible = false))
 

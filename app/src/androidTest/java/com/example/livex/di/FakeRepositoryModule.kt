@@ -2,6 +2,7 @@ package com.example.livex.di
 
 import androidx.media3.common.MimeTypes
 import com.example.livex.data.Stream
+import com.example.livex.data.manifest.ManifestRepository
 import com.example.livex.data.stream.StreamRepository
 import dagger.Module
 import dagger.Provides
@@ -17,7 +18,9 @@ val FAKE_STREAM = Stream(
     isLive = false,
 )
 
-/** Replaces [RepositoryModule] in every instrumented test with fast, deterministic fakes. */
+const val FAKE_MANIFEST = "#EXTM3U\n#EXT-X-TARGETDURATION:6\n#EXTINF:6.0,\nseg0.ts\n#EXT-X-ENDLIST"
+
+/** Replaces [RepositoryModule] in every instrumented test with fast, deterministic fakes (no network). */
 @Module
 @TestInstallIn(components = [SingletonComponent::class], replaces = [RepositoryModule::class])
 object FakeRepositoryModule {
@@ -26,5 +29,11 @@ object FakeRepositoryModule {
     @Singleton
     fun provideStreamRepository(): StreamRepository = object : StreamRepository {
         override suspend fun getStreams() = listOf(FAKE_STREAM)
+    }
+
+    @Provides
+    @Singleton
+    fun provideManifestRepository(): ManifestRepository = object : ManifestRepository {
+        override suspend fun fetch(url: String) = FAKE_MANIFEST
     }
 }

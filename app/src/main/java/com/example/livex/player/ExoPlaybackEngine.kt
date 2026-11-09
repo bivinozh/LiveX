@@ -6,7 +6,6 @@ import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.common.util.Util
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
@@ -17,6 +16,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.example.livex.data.Stream
 import com.example.livex.qoe.QoeMetrics
 import com.example.livex.qoe.QoeTracker
+import com.example.livex.di.UserAgent
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,13 +37,12 @@ import kotlin.time.Duration.Companion.milliseconds
 class ExoPlaybackEngine @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val okHttpClient: OkHttpClient,
+    /** Shared with the manifest viewer (see NetworkModule.provideUserAgent). */
+    @param:UserAgent private val userAgent: String,
 ) : PlaybackEngine {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val tracker = QoeTracker()
-
-    /** e.g. "LiveX/1.0 (Linux;Android 16) AndroidXMedia3/1.11.1": identifies the app to CDNs and in server logs. */
-    private val userAgent: String = Util.getUserAgent(context, USER_AGENT_APP_NAME)
 
     private var currentStream: Stream? = null
     private var resumeOnStart = false
@@ -157,9 +156,5 @@ class ExoPlaybackEngine @Inject constructor(
                 .build()
         }
         return player
-    }
-
-    private companion object {
-        const val USER_AGENT_APP_NAME = "LiveX"
     }
 }
