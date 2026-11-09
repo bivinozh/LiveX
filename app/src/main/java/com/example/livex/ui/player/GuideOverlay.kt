@@ -73,7 +73,7 @@ private fun GuidePanel(state: PlayerState, onIntent: (PlayerIntent) -> Unit, mod
             .padding(horizontal = 24.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        VideoInfo(state)
+        VideoInfo(state, onIntent)
 
         Text(
             "Topic ${state.topicIndex + 1} / ${state.topics.size}",
@@ -105,10 +105,12 @@ private fun GuidePanel(state: PlayerState, onIntent: (PlayerIntent) -> Unit, mod
 }
 
 /** Which stream is playing. To change it, press Back and pick another one from the list. */
+@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun VideoInfo(state: PlayerState) {
+private fun VideoInfo(state: PlayerState, onIntent: (PlayerIntent) -> Unit) {
     Text(state.stream.formatLabel, style = MaterialTheme.typography.labelMedium, color = Muted)
     Text(state.stream.title, style = MaterialTheme.typography.titleMedium, color = Color.White)
+    Button(onClick = { onIntent(PlayerIntent.OpenManifest) }) { Text("View manifest") }
     Spacer(Modifier.height(4.dp))
 }
 

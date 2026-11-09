@@ -28,6 +28,7 @@ sealed interface PlayerIntent : UiIntent {
     data object PreviousTopic : PlayerIntent
     data object ToggleOptimization : PlayerIntent
     data object ToggleGuide : PlayerIntent
+    data object OpenManifest : PlayerIntent
 
     /** App came to the foreground (Lifecycle ON_START). */
     data object LifecycleStart : PlayerIntent
@@ -38,4 +39,5 @@ sealed interface PlayerIntent : UiIntent {
 
 sealed interface PlayerEffect : UiEffect {
     data class ShowMessage(val message: String) : PlayerEffect
+    data class NavigateToManifest(val streamId: String) : PlayerEffect
 }

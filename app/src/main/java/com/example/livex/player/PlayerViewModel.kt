@@ -49,6 +49,7 @@ class PlayerViewModel @Inject constructor(
             }
             PlayerIntent.ToggleGuide -> setState { copy(isGuideVisible = !isGuideVisible) }
             PlayerIntent.ToggleOptimization -> toggleOptimization()
+            PlayerIntent.OpenManifest -> sendEffect(PlayerEffect.NavigateToManifest(currentState.stream.id))
             PlayerIntent.LifecycleStart -> engine.resume()
             PlayerIntent.LifecycleStop -> {
                 engine.pause()
