@@ -2,6 +2,7 @@ package com.example.livex.player
 
 import androidx.media3.common.Player
 import com.example.livex.data.Stream
+import com.example.livex.network.ThrottleMode
 import com.example.livex.qoe.QoeMetrics
 import com.example.livex.qoe.StatsState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +30,11 @@ class FakePlaybackEngine : PlaybackEngine {
         private set
 
     val seekOffsets = mutableListOf<Long>()
+    val throttleModes = mutableListOf<ThrottleMode>()
+
+    override fun setThrottleMode(mode: ThrottleMode) {
+        throttleModes += mode
+    }
 
     override fun seekBy(offsetMs: Long) {
         seekOffsets += offsetMs

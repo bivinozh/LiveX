@@ -5,6 +5,7 @@ import app.cash.turbine.test
 import com.example.livex.data.SampleStreams
 import com.example.livex.data.Topics
 import com.example.livex.navigation.PlayerRoute
+import com.example.livex.network.ThrottleMode
 import com.example.livex.qoe.QoeMetrics
 import com.example.livex.qoe.StallStats
 import com.example.livex.qoe.StatsState
@@ -229,6 +230,20 @@ class PlayerViewModelTest {
         viewModel.onIntent(PlayerIntent.SeekBy(-10_000))
 
         assertEquals(listOf(60_000L, -10_000L), engine.seekOffsets)
+    }
+
+    @Test
+    fun `network is unlimited by default`() {
+        assertEquals(ThrottleMode.UNLIMITED, viewModel.state.value.throttleMode)
+    }
+
+    @Test
+    fun `changing the network mode applies it at runtime without restarting the player`() {
+        viewModel.onIntent(PlayerIntent.SetThrottleMode(ThrottleMode.KBPS_800))
+
+        assertEquals(ThrottleMode.KBPS_800, viewModel.state.value.throttleMode)
+        assertEquals(listOf(ThrottleMode.KBPS_800), engine.throttleModes)
+        assertEquals("no rebuild", 1, engine.startedConfigs.size)
     }
 
     @Test

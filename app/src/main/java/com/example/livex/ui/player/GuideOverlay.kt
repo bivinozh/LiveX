@@ -125,6 +125,9 @@ private fun VideoInfo(state: PlayerState, onIntent: (PlayerIntent) -> Unit) {
         Button(onClick = { onIntent(PlayerIntent.SeekBy(-10_000)) }) { Text("⏪ 10 s") }
         Button(onClick = { onIntent(PlayerIntent.SeekBy(60_000)) }) { Text("60 s ⏩") }
     }
+    // Throttle simulator: watch Est. bandwidth fall, Resolution step down (ABR) and, if the buffer
+    // can't keep up, Stalls and red bands in the buffer chart.
+    NetworkDropdown(mode = state.throttleMode, onSelect = { onIntent(PlayerIntent.SetThrottleMode(it)) })
     Spacer(Modifier.height(4.dp))
 }
 
