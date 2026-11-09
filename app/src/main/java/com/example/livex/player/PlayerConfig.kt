@@ -1,5 +1,6 @@
 package com.example.livex.player
 
+import com.example.livex.player.live.LiveLatency
 import com.example.livex.settings.BufferSettings
 
 /** The optimizations that can be switched on/off from the guide overlay. */
@@ -16,6 +17,8 @@ data class PlayerConfig(
     val tunedBuffer: Boolean = false,
     /** The saved buffer settings (DataStore). Used when [tunedBuffer] is on. */
     val buffer: BufferSettings = BufferSettings.DEFAULT,
+    /** Target latency for live streams (MediaItem.LiveConfiguration). Ignored for VOD. */
+    val liveLatency: LiveLatency = LiveLatency.DEFAULT,
     val dataSaverAbr: Boolean = false,
     val okHttpNetwork: Boolean = true,
 ) {

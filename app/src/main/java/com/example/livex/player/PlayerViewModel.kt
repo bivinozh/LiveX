@@ -7,6 +7,8 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import com.example.livex.core.mvi.MviViewModel
 import com.example.livex.data.SampleStreams
+import com.example.livex.player.live.LiveLatency
+import com.example.livex.player.live.LiveWindow
 import com.example.livex.qoe.StatsState
 import com.example.livex.settings.BufferSettings
 import com.example.livex.settings.BufferSettingsRepository
@@ -40,6 +42,9 @@ class PlayerViewModel @Inject constructor(
      * recomposing the whole player screen twice a second.
      */
     val stats: StateFlow<StatsState> = engine.stats
+
+    /** Live (DVR) window for the live control bar; also 500 ms telemetry, so kept out of [state] too. */
+    val live: StateFlow<LiveWindow?> = engine.live
 
     /**
      * Translates player callbacks into [PlayerState.playback]. Callbacks arrive on the main thread
@@ -144,6 +149,8 @@ class PlayerViewModel @Inject constructor(
             PlayerIntent.OpenManifest -> sendEffect(PlayerEffect.NavigateToManifest(currentState.stream.id))
             PlayerIntent.OpenBufferSettings -> sendEffect(PlayerEffect.NavigateToBufferSettings)
             is PlayerIntent.SeekBy -> engine.seekBy(intent.offsetMs)
+            PlayerIntent.GoLive -> engine.goLive()
+            is PlayerIntent.SetLiveLatency -> setLiveLatency(intent.latency)
             is PlayerIntent.SetThrottleMode -> {
                 // Unlike the optimization toggles, no engine.start(): the data source reads the mode
                 // on every read, so playback (and its buffer) carries on under the new conditions.
@@ -186,7 +193,23 @@ class PlayerViewModel @Inject constructor(
         sendEffect(PlayerEffect.ShowMessage("Player restarted. $label"))
     }
 
+    /**
+     * The target is part of the MediaItem (LiveConfiguration), so a live player is rebuilt and joins at
+     * the new target. Speed control alone would take minutes to drift from 30 s to 3 s at ±5 %.
+     */
+    private fun setLiveLatency(latency: LiveLatency) {
+        if (latency == currentState.config.liveLatency) return
+        val newConfig = currentState.config.copy(liveLatency = latency)
+        setState { copy(config = newConfig) }
+        savedState[KEY_LIVE_LATENCY] = latency.name
+        if (currentState.stream.isLive) {
+            engine.start(currentState.stream, newConfig)
+            sendEffect(PlayerEffect.ShowMessage("Target latency ${latency.label}: rejoining live"))
+        }
+    }
+
     private fun saveState() {
+        savedState[KEY_LIVE_LATENCY] = currentState.config.liveLatency.name
         savedState[KEY_POSITION_MS] = engine.currentPositionMs
         savedState[KEY_TUNED_BUFFER] = currentState.config.tunedBuffer
         savedState[KEY_DATA_SAVER_ABR] = currentState.config.dataSaverAbr
@@ -202,6 +225,9 @@ class PlayerViewModel @Inject constructor(
                     tunedBuffer = savedState.get<Boolean>(KEY_TUNED_BUFFER) ?: defaults.tunedBuffer,
                     dataSaverAbr = savedState.get<Boolean>(KEY_DATA_SAVER_ABR) ?: defaults.dataSaverAbr,
                     okHttpNetwork = savedState.get<Boolean>(KEY_OKHTTP_NETWORK) ?: defaults.okHttpNetwork,
+                    liveLatency = savedState.get<String>(KEY_LIVE_LATENCY)
+                        ?.let { name -> LiveLatency.entries.firstOrNull { it.name == name } }
+                        ?: defaults.liveLatency,
                 ),
             )
         }
@@ -228,5 +254,6 @@ class PlayerViewModel @Inject constructor(
         const val KEY_TUNED_BUFFER = "player.tunedBuffer"
         const val KEY_DATA_SAVER_ABR = "player.dataSaverAbr"
         const val KEY_OKHTTP_NETWORK = "player.okHttpNetwork"
+        const val KEY_LIVE_LATENCY = "player.liveLatency"
     }
 }

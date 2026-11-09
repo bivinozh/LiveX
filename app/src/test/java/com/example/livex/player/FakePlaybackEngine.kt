@@ -3,6 +3,7 @@ package com.example.livex.player
 import androidx.media3.common.Player
 import com.example.livex.data.Stream
 import com.example.livex.network.ThrottleMode
+import com.example.livex.player.live.LiveWindow
 import com.example.livex.qoe.QoeMetrics
 import com.example.livex.qoe.StatsState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +15,13 @@ class FakePlaybackEngine : PlaybackEngine {
     override val metrics = MutableStateFlow(QoeMetrics())
     override val stats = MutableStateFlow(StatsState())
     override var currentPositionMs: Long = 0
+    override val live = MutableStateFlow<LiveWindow?>(null)
+    var goLiveCount = 0
+        private set
+
+    override fun goLive() {
+        goLiveCount++
+    }
 
     val startedConfigs = mutableListOf<PlayerConfig>()
     val startedStreams = mutableListOf<Stream>()

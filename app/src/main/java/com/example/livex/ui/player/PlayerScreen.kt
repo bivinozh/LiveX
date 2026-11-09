@@ -71,6 +71,21 @@ fun PlayerScreen(
             StatsOverlay(stats, Modifier.align(Alignment.TopStart).padding(24.dp))
         }
 
+        if (state.stream.isLive) {
+            // Collected only for live streams; bottom of the video area, left of the guide panel.
+            val live by viewModel.live.collectAsStateWithLifecycle()
+            live?.let { window ->
+                LiveControlBar(
+                    live = window,
+                    latency = state.config.liveLatency,
+                    onIntent = viewModel::onIntent,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 24.dp, bottom = 24.dp, end = 24.dp + if (state.isGuideVisible) GuidePanelWidth else 0.dp),
+                )
+            }
+        }
+
         GuideOverlay(state = state, onIntent = viewModel::onIntent)
 
         // Drawn last so the error card sits above the guide; centered in the visible video area.
