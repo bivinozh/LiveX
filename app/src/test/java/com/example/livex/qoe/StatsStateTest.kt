@@ -112,6 +112,22 @@ class StatsStateTest {
     }
 
     @Test
+    fun `target offset is shown for live, dash for VOD`() {
+        assertEquals("10.0 s", rowValue(StatsState(liveOffsetMs = 9_000, targetOffsetMs = 10_000), StatsState.TARGET_OFFSET))
+        assertEquals("—", rowValue(StatsState(), StatsState.TARGET_OFFSET))
+    }
+
+    @Test
+    fun `live speed shows what the speed control is doing`() {
+        val live = StatsState(liveOffsetMs = 12_000, targetOffsetMs = 10_000)
+
+        assertEquals("1.03× ▲ catching up", rowValue(live.copy(playbackSpeed = 1.03f), StatsState.SPEED))
+        assertEquals("0.97× ▼ falling back", rowValue(live.copy(playbackSpeed = 0.97f), StatsState.SPEED))
+        assertEquals("1.00× on target", rowValue(live.copy(playbackSpeed = 1f), StatsState.SPEED))
+        assertEquals("1.00×", rowValue(StatsState(playbackSpeed = 1f), StatsState.SPEED)) // VOD
+    }
+
+    @Test
     fun `unknown values show a dash`() {
         val stats = StatsState()
 
@@ -132,6 +148,7 @@ class StatsStateTest {
                 StatsState.BANDWIDTH,
                 StatsState.BUFFER,
                 StatsState.LIVE_OFFSET,
+                StatsState.TARGET_OFFSET,
                 StatsState.SPEED,
                 StatsState.DROPPED_FRAMES,
                 StatsState.LOAD_ERRORS,

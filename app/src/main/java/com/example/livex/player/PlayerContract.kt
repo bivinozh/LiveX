@@ -8,6 +8,7 @@ import com.example.livex.data.Stream
 import com.example.livex.data.Topic
 import com.example.livex.data.Topics
 import com.example.livex.network.ThrottleMode
+import com.example.livex.player.live.LiveLatency
 import com.example.livex.qoe.QoeMetrics
 
 data class PlayerState(
@@ -49,6 +50,12 @@ sealed interface PlayerIntent : UiIntent {
 
     /** Network dropdown: simulate a slower or unstable connection. */
     data class SetThrottleMode(val mode: ThrottleMode) : PlayerIntent
+
+    /** GO LIVE button: back to the live edge (minus the target offset). */
+    data object GoLive : PlayerIntent
+
+    /** Live target latency buttons (3 s / 10 s / 30 s). */
+    data class SetLiveLatency(val latency: LiveLatency) : PlayerIntent
 
     /** App came to the foreground (Lifecycle ON_START). */
     data object LifecycleStart : PlayerIntent

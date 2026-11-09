@@ -23,6 +23,8 @@ data class StatsState(
     val bufferedDurationMs: Long = 0,
     /** Distance behind the live edge (Player.currentLiveOffset); null for VOD. */
     val liveOffsetMs: Long? = null,
+    /** Where LivePlaybackSpeedControl is steering the live offset to; null for VOD. */
+    val targetOffsetMs: Long? = null,
     val playbackSpeed: Float = 1f,
     val droppedFrames: Int = 0,
     val loadErrorCount: Int = 0,
@@ -40,7 +42,8 @@ data class StatsState(
         Row(BANDWIDTH, bandwidthEstimateBps?.let(::mbps) ?: NONE),
         Row(BUFFER, seconds(bufferedDurationMs)),
         Row(LIVE_OFFSET, liveOffsetText()),
-        Row(SPEED, String.format(Locale.US, "%.2f×", playbackSpeed)),
+        Row(TARGET_OFFSET, targetOffsetMs?.let(::seconds) ?: NONE),
+        Row(SPEED, speedText()),
         Row(DROPPED_FRAMES, "$droppedFrames"),
         Row(LOAD_ERRORS, "$loadErrorCount"),
         Row(STARTUP, stalls.startupTimeMs?.let { "$it ms" } ?: NONE),
@@ -54,6 +57,20 @@ data class StatsState(
      * Playback can't be ahead of the live edge, so a negative value means the device clock is wrong
      * (DASH can correct this with a UTCTiming element; HLS has no equivalent).
      */
+    /**
+     * On live streams DefaultLivePlaybackSpeedControl nudges the speed to hold the target offset:
+     * above 1x = too far behind, catching up; below 1x = too close to the edge, falling back.
+     */
+    private fun speedText(): String {
+        val speed = String.format(Locale.US, "%.2f×", playbackSpeed)
+        if (targetOffsetMs == null) return speed
+        return when {
+            playbackSpeed > 1.005f -> "$speed ▲ catching up"
+            playbackSpeed < 0.995f -> "$speed ▼ falling back"
+            else -> "$speed on target"
+        }
+    }
+
     private fun liveOffsetText(): String = when {
         liveOffsetMs == null -> "$NONE (VOD)"
         liveOffsetMs < 0 -> CLOCK_SKEW
@@ -68,6 +85,7 @@ data class StatsState(
         const val BANDWIDTH = "Est. bandwidth"
         const val BUFFER = "Buffer ahead"
         const val LIVE_OFFSET = "Live offset"
+        const val TARGET_OFFSET = "Target offset"
         const val SPEED = "Playback speed"
         const val DROPPED_FRAMES = "Dropped frames"
         const val LOAD_ERRORS = "Load errors"
@@ -86,6 +104,7 @@ data class StatsState(
             bandwidthEstimateBps = metrics.bandwidthEstimateBps,
             bufferedDurationMs = sample.bufferedDurationMs,
             liveOffsetMs = sample.liveOffsetMs,
+            targetOffsetMs = sample.targetOffsetMs,
             playbackSpeed = sample.playbackSpeed,
             droppedFrames = metrics.droppedFrames,
             loadErrorCount = metrics.loadErrorCount,
@@ -104,4 +123,6 @@ data class PlayerSample(
     val bufferedDurationMs: Long,
     val liveOffsetMs: Long?,
     val playbackSpeed: Float,
+    /** Resolved target live offset (MediaItem LiveConfiguration + manifest); null for VOD. */
+    val targetOffsetMs: Long? = null,
 )

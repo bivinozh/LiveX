@@ -5,6 +5,8 @@ import app.cash.turbine.test
 import com.example.livex.data.SampleStreams
 import com.example.livex.data.Topics
 import com.example.livex.navigation.PlayerRoute
+import com.example.livex.player.live.LiveLatency
+import com.example.livex.player.live.LiveWindow
 import com.example.livex.network.ThrottleMode
 import com.example.livex.qoe.QoeMetrics
 import com.example.livex.qoe.StallStats
@@ -302,6 +304,67 @@ class PlayerViewModelTest {
 
             assertEquals(PlayerEffect.NavigateToBufferSettings, awaitItem())
         }
+    }
+
+    // --- Live latency ---
+
+    @Test
+    fun `live streams start with the default 10 s target`() {
+        val vm = create(mapOf(PlayerViewModel.KEY_STREAM_ID to SampleStreams.dashIfLivesim.id))
+
+        assertEquals(LiveLatency.STANDARD, vm.state.value.config.liveLatency)
+        assertEquals(LiveLatency.STANDARD, engine.startedConfigs.single().liveLatency)
+    }
+
+    @Test
+    fun `changing the target latency rebuilds a live player at the new target`() {
+        val vm = create(mapOf(PlayerViewModel.KEY_STREAM_ID to SampleStreams.dashIfLivesim.id))
+
+        vm.onIntent(PlayerIntent.SetLiveLatency(LiveLatency.LOW))
+
+        assertEquals(LiveLatency.LOW, vm.state.value.config.liveLatency)
+        assertEquals(2, engine.startedConfigs.size)
+        assertEquals(LiveLatency.LOW, engine.startedConfigs.last().liveLatency)
+    }
+
+    @Test
+    fun `latency does not restart a VOD player and choosing the current one does nothing`() {
+        viewModel.onIntent(PlayerIntent.SetLiveLatency(LiveLatency.STANDARD)) // unchanged
+        viewModel.onIntent(PlayerIntent.SetLiveLatency(LiveLatency.HIGH)) // VOD: stored only
+
+        assertEquals(1, engine.startedConfigs.size)
+        assertEquals(LiveLatency.HIGH, viewModel.state.value.config.liveLatency)
+    }
+
+    @Test
+    fun `target latency is saved and restored after process death`() {
+        viewModel.onIntent(PlayerIntent.SetLiveLatency(LiveLatency.HIGH))
+        viewModel.onIntent(PlayerIntent.LifecycleStop)
+        assertEquals(LiveLatency.HIGH.name, savedState.get<String>(PlayerViewModel.KEY_LIVE_LATENCY))
+
+        val restored = create(
+            mapOf(
+                PlayerViewModel.KEY_STREAM_ID to SampleStreams.dashIfLivesim.id,
+                PlayerViewModel.KEY_LIVE_LATENCY to LiveLatency.HIGH.name,
+            ),
+        )
+        assertEquals(LiveLatency.HIGH, restored.state.value.config.liveLatency)
+        assertEquals(LiveLatency.HIGH, engine.startedConfigs.single().liveLatency)
+    }
+
+    @Test
+    fun `go live jumps to the live edge`() {
+        viewModel.onIntent(PlayerIntent.GoLive)
+
+        assertEquals(1, engine.goLiveCount)
+    }
+
+    @Test
+    fun `live window comes straight from the engine`() {
+        val window = LiveWindow(60_000, 30_000, 50_000, 10_000)
+        engine.live.value = window
+
+        assertEquals(window, viewModel.live.value)
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.example.livex.player
 import androidx.media3.common.Player
 import com.example.livex.data.Stream
 import com.example.livex.network.ThrottleMode
+import com.example.livex.player.live.LiveWindow
 import com.example.livex.qoe.QoeMetrics
 import com.example.livex.qoe.StatsState
 import kotlinx.coroutines.flow.StateFlow
@@ -36,6 +37,12 @@ interface PlaybackEngine {
 
     /** Resumes playback only if it was playing when [pause] was called. */
     fun resume()
+
+    /** Live (DVR) window, refreshed every 500 ms; null for VOD or before the timeline is known. */
+    val live: StateFlow<LiveWindow?>
+
+    /** GO LIVE: seekToDefaultPosition() = live edge minus the target offset. */
+    fun goLive()
 
     /** Network throttle simulator: applies to the next bytes read, without rebuilding the player. */
     fun setThrottleMode(mode: ThrottleMode)

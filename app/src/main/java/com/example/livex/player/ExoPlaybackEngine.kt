@@ -6,6 +6,7 @@ import android.os.SystemClock
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Timeline
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
@@ -20,6 +21,7 @@ import com.example.livex.data.Stream
 import com.example.livex.qoe.QoeMetrics
 import com.example.livex.qoe.QoeTracker
 import com.example.livex.network.NetworkThrottle
+import com.example.livex.player.live.LiveWindow
 import com.example.livex.network.ThrottleMode
 import com.example.livex.network.ThrottlingDataSource
 import com.example.livex.qoe.BufferHistory
@@ -64,6 +66,9 @@ class ExoPlaybackEngine @Inject constructor(
     override val metrics: StateFlow<QoeMetrics> = tracker.metrics
     private val _stats = MutableStateFlow(StatsState())
     private val bufferHistory = BufferHistory()
+    private val _live = MutableStateFlow<LiveWindow?>(null)
+    override val live: StateFlow<LiveWindow?> = _live.asStateFlow()
+    private val window = Timeline.Window()
 
     /** One simulated link for the engine's lifetime: survives player rebuilds, switchable at runtime. */
     private val throttle = NetworkThrottle()
@@ -86,8 +91,10 @@ class ExoPlaybackEngine @Inject constructor(
                     val metrics = tracker.metrics.value
                     bufferHistory.add(BufferPoint(nowMs, sample.bufferedDurationMs, metrics.stalls.isStalled))
                     _stats.value = StatsState.from(metrics, sample, bufferHistory.points)
+                    _live.value = current.liveWindow()
                 } else {
                     _stats.value = StatsState()
+                    _live.value = null
                 }
                 delay(STATS_INTERVAL)
             }
@@ -100,7 +107,29 @@ class ExoPlaybackEngine @Inject constructor(
         // DASH availabilityStartTime); otherwise it's TIME_UNSET.
         liveOffsetMs = currentLiveOffset.takeIf { isCurrentMediaItemLive && it != C.TIME_UNSET },
         playbackSpeed = playbackParameters.speed,
+        targetOffsetMs = currentWindowOrNull()?.liveConfiguration?.targetOffsetMs?.takeIf { it != C.TIME_UNSET },
     )
+
+    /** The current live window, or null for VOD / before the first manifest is parsed. */
+    private fun Player.currentWindowOrNull(): Timeline.Window? {
+        if (!isCurrentMediaItemLive || currentTimeline.isEmpty) return null
+        return currentTimeline.getWindow(currentMediaItemIndex, window)
+    }
+
+    /**
+     * DVR window for the seek bar. window.liveConfiguration holds the RESOLVED target: our
+     * MediaItem.LiveConfiguration merged with what the manifest asks for (and clamped to it).
+     */
+    private fun Player.liveWindow(): LiveWindow? {
+        val w = currentWindowOrNull() ?: return null
+        if (w.durationMs == C.TIME_UNSET) return null
+        return LiveWindow(
+            windowDurationMs = w.durationMs,
+            positionMs = currentPosition,
+            defaultPositionMs = w.defaultPositionMs,
+            targetOffsetMs = w.liveConfiguration?.targetOffsetMs?.takeIf { it != C.TIME_UNSET },
+        )
+    }
 
     override fun start(stream: Stream, config: PlayerConfig, startPositionMs: Long?) {
         // An explicit position wins (restore after process death). Otherwise resume only when
@@ -123,6 +152,11 @@ class ExoPlaybackEngine @Inject constructor(
         val mediaItem = MediaItem.Builder()
             .setUri(stream.url)
             .setMimeType(stream.mimeType)
+            .apply {
+                // Live latency control: target offset + the speed range LivePlaybackSpeedControl may
+                // use to hold it. Overrides the manifest's own suggestion (e.g. DASH ServiceDescription).
+                if (stream.isLive) setLiveConfiguration(config.liveLatency.liveConfiguration())
+            }
             .build()
         if (resumePositionMs != null) {
             newPlayer.setMediaItem(mediaItem, resumePositionMs)
@@ -146,6 +180,12 @@ class ExoPlaybackEngine @Inject constructor(
     override fun resume() {
         if (resumeOnStart) _player.value?.play()
         resumeOnStart = false
+    }
+
+    override fun goLive() {
+        // Default position of a live window = live edge minus the target offset. Unlike a DVR seek,
+        // this also clears the speed control's "user chose this offset" override.
+        _player.value?.seekToDefaultPosition()
     }
 
     override fun setThrottleMode(mode: ThrottleMode) {
