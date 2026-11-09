@@ -4,10 +4,9 @@ import java.util.Locale
 
 data class QoeMetrics(
     val playbackState: String = "Idle",
-    val startupTimeMs: Long? = null,
     val bufferedDurationMs: Long = 0,
-    val rebufferCount: Int = 0,
-    val rebufferTimeMs: Long = 0,
+    /** Startup (VST), stalls, seek buffering and rebuffering ratio, from [StallTracker]. */
+    val stalls: StallStats = StallStats(),
     val droppedFrames: Int = 0,
     val videoWidth: Int = 0,
     val videoHeight: Int = 0,
@@ -25,7 +24,7 @@ enum class MetricKey(val label: String) {
     STATE("Playback state"),
     STARTUP("Startup time"),
     BUFFERED("Buffered ahead"),
-    REBUFFERS("Rebuffers"),
+    REBUFFERS("Stalls"),
     DROPPED("Dropped frames"),
     RESOLUTION("Resolution"),
     BITRATE("Variant bitrate"),
@@ -40,9 +39,9 @@ private const val NONE = "—"
 
 fun QoeMetrics.formatted(key: MetricKey): String = when (key) {
     MetricKey.STATE -> playbackState
-    MetricKey.STARTUP -> startupTimeMs?.let { "$it ms" } ?: NONE
+    MetricKey.STARTUP -> stalls.startupTimeMs?.let { "$it ms" } ?: NONE
     MetricKey.BUFFERED -> String.format(Locale.US, "%.1f s", bufferedDurationMs / 1000.0)
-    MetricKey.REBUFFERS -> "$rebufferCount ($rebufferTimeMs ms)"
+    MetricKey.REBUFFERS -> "${stalls.stallCount} (${stalls.stallTimeMs} ms)"
     MetricKey.DROPPED -> "$droppedFrames"
     MetricKey.RESOLUTION -> if (videoWidth > 0) "$videoWidth×$videoHeight" else NONE
     MetricKey.BITRATE -> videoBitrateBps?.let { "${it / 1000} kbps" } ?: NONE

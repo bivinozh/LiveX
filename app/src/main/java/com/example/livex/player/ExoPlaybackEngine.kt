@@ -17,6 +17,8 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.example.livex.data.Stream
 import com.example.livex.qoe.QoeMetrics
 import com.example.livex.qoe.QoeTracker
+import com.example.livex.qoe.BufferHistory
+import com.example.livex.qoe.BufferPoint
 import com.example.livex.qoe.PlayerSample
 import com.example.livex.qoe.StatsState
 import com.example.livex.di.UserAgent
@@ -56,6 +58,7 @@ class ExoPlaybackEngine @Inject constructor(
     override val player: StateFlow<Player?> = _player.asStateFlow()
     override val metrics: StateFlow<QoeMetrics> = tracker.metrics
     private val _stats = MutableStateFlow(StatsState())
+    private val bufferHistory = BufferHistory()
     override val stats: StateFlow<StatsState> = _stats.asStateFlow()
     override val currentPositionMs: Long
         get() = _player.value?.currentPosition ?: 0L
@@ -67,9 +70,12 @@ class ExoPlaybackEngine @Inject constructor(
             while (isActive) {
                 val current = _player.value
                 if (current != null) {
+                    val nowMs = SystemClock.elapsedRealtime()
                     val sample = current.sample()
-                    tracker.onBufferedDuration(sample.bufferedDurationMs)
-                    _stats.value = StatsState.from(tracker.metrics.value, sample)
+                    tracker.onTick(sample.bufferedDurationMs, nowMs)
+                    val metrics = tracker.metrics.value
+                    bufferHistory.add(BufferPoint(nowMs, sample.bufferedDurationMs, metrics.stalls.isStalled))
+                    _stats.value = StatsState.from(metrics, sample, bufferHistory.points)
                 } else {
                     _stats.value = StatsState()
                 }
@@ -97,7 +103,9 @@ class ExoPlaybackEngine @Inject constructor(
 
         val newPlayer = buildPlayer(config)
         newPlayer.addAnalyticsListener(tracker)
+        // The play request: startup (VST) is measured from here to the first rendered frame.
         tracker.reset(nowMs = SystemClock.elapsedRealtime())
+        bufferHistory.clear()
 
         val mediaItem = MediaItem.Builder()
             .setUri(stream.url)
@@ -125,6 +133,12 @@ class ExoPlaybackEngine @Inject constructor(
     override fun resume() {
         if (resumeOnStart) _player.value?.play()
         resumeOnStart = false
+    }
+
+    override fun seekBy(offsetMs: Long) {
+        val current = _player.value ?: return
+        // Clamp to the start; seeking past the end/live edge is clamped by the player itself.
+        current.seekTo((current.currentPosition + offsetMs).coerceAtLeast(0))
     }
 
     override fun retry() {

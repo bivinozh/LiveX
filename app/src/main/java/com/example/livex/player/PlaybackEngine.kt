@@ -36,6 +36,9 @@ interface PlaybackEngine {
     /** Resumes playback only if it was playing when [pause] was called. */
     fun resume()
 
+    /** Seeks relative to the current position (negative = back). */
+    fun seekBy(offsetMs: Long)
+
     /** After a playback error: prepare() again, continuing from the current position. */
     fun retry()
 

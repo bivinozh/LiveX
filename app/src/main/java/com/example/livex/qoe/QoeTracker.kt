@@ -2,6 +2,7 @@ package com.example.livex.qoe
 
 import androidx.annotation.OptIn
 import androidx.media3.common.Format
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DecoderReuseEvaluation
 import androidx.media3.exoplayer.analytics.AnalyticsListener
@@ -22,7 +23,21 @@ class QoeTracker : AnalyticsListener {
 
     fun reset(nowMs: Long) = update { reset(nowMs) }
 
-    fun onBufferedDuration(durationMs: Long) = update { onBufferedDuration(durationMs) }
+    /** Periodic sample from the engine's 500 ms loop. */
+    fun onTick(bufferedDurationMs: Long, nowMs: Long) = update { onTick(bufferedDurationMs, nowMs) }
+
+    override fun onPlayWhenReadyChanged(eventTime: AnalyticsListener.EventTime, playWhenReady: Boolean, reason: Int) =
+        update { onPlayWhenReadyChanged(playWhenReady, eventTime.realtimeMs) }
+
+    /** Only user/app seeks matter here; other discontinuities (auto-transition, ad insertion...) are ignored. */
+    override fun onPositionDiscontinuity(
+        eventTime: AnalyticsListener.EventTime,
+        oldPosition: Player.PositionInfo,
+        newPosition: Player.PositionInfo,
+        reason: Int,
+    ) {
+        if (reason == Player.DISCONTINUITY_REASON_SEEK) update { onSeek(eventTime.realtimeMs) }
+    }
 
     override fun onPlaybackStateChanged(eventTime: AnalyticsListener.EventTime, state: Int) =
         update { onPlaybackStateChanged(state, eventTime.realtimeMs) }

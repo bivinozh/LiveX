@@ -38,6 +38,9 @@ sealed interface PlayerIntent : UiIntent {
     /** Retry button on the error card. */
     data object Retry : PlayerIntent
 
+    /** Seek buttons in the guide: relative jump, negative = back. */
+    data class SeekBy(val offsetMs: Long) : PlayerIntent
+
     /** App came to the foreground (Lifecycle ON_START). */
     data object LifecycleStart : PlayerIntent
 

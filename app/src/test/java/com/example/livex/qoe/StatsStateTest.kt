@@ -14,6 +14,14 @@ class StatsStateTest {
         bandwidthEstimateBps = 8_400_000,
         droppedFrames = 3,
         loadErrorCount = 1,
+        stalls = StallStats(
+            startupTimeMs = 840,
+            stallCount = 2,
+            stallTimeMs = 1_500,
+            seekBufferingCount = 1,
+            seekBufferingTimeMs = 900,
+            playingTimeMs = 58_500,
+        ),
     )
 
     private fun rowValue(stats: StatsState, label: String) = stats.rows().single { it.label == label }.value
@@ -37,9 +45,36 @@ class StatsStateTest {
                 playbackSpeed = 1.03f,
                 droppedFrames = 3,
                 loadErrorCount = 1,
+                stalls = metrics.stalls,
             ),
             stats,
         )
+    }
+
+    @Test
+    fun `buffer history is passed through for the chart`() {
+        val history = listOf(BufferPoint(atMs = 0, bufferedMs = 4_000, isStalled = false))
+
+        val stats = StatsState.from(metrics, PlayerSample(0, null, 1f), history)
+
+        assertEquals(history, stats.bufferHistory)
+    }
+
+    @Test
+    fun `stall rows show startup, stalls, ratio and seek buffering`() {
+        val stats = StatsState.from(metrics, PlayerSample(0, null, 1f))
+
+        assertEquals("840 ms", rowValue(stats, StatsState.STARTUP))
+        assertEquals("2 (1.5 s)", rowValue(stats, StatsState.STALLS))
+        assertEquals("2.50%", rowValue(stats, StatsState.REBUFFER_RATIO)) // 1.5 / (58.5 + 1.5)
+        assertEquals("1 (0.9 s)", rowValue(stats, StatsState.SEEK_BUFFERING))
+    }
+
+    @Test
+    fun `ongoing stall is marked`() {
+        val stats = StatsState(stalls = StallStats(stallCount = 1, stallTimeMs = 2_000, isStalled = true))
+
+        assertEquals("1 (2.0 s) ●", rowValue(stats, StatsState.STALLS))
     }
 
     @Test
@@ -83,6 +118,8 @@ class StatsStateTest {
         assertEquals("—", rowValue(stats, StatsState.RESOLUTION))
         assertEquals("—", rowValue(stats, StatsState.VIDEO_BITRATE))
         assertEquals("—", rowValue(stats, StatsState.BANDWIDTH))
+        assertEquals("—", rowValue(stats, StatsState.STARTUP))
+        assertEquals("—", rowValue(stats, StatsState.REBUFFER_RATIO))
     }
 
     @Test
@@ -98,6 +135,10 @@ class StatsStateTest {
                 StatsState.SPEED,
                 StatsState.DROPPED_FRAMES,
                 StatsState.LOAD_ERRORS,
+                StatsState.STARTUP,
+                StatsState.STALLS,
+                StatsState.REBUFFER_RATIO,
+                StatsState.SEEK_BUFFERING,
             ),
             StatsState().rows().map { it.label },
         )

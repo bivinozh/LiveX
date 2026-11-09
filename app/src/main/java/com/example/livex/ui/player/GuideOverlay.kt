@@ -34,6 +34,7 @@ import com.example.livex.player.PlayerIntent
 import com.example.livex.player.PlayerState
 import com.example.livex.qoe.MetricKey
 import com.example.livex.qoe.QoeMetrics
+import com.example.livex.qoe.StallStats
 import com.example.livex.qoe.formatted
 import com.example.livex.ui.theme.LiveXTheme
 
@@ -119,6 +120,11 @@ private fun VideoInfo(state: PlayerState, onIntent: (PlayerIntent) -> Unit) {
             Text(if (state.isStatsVisible) "Stats: ON" else "Stats: OFF")
         }
     }
+    // A 60 s jump usually lands beyond the buffer: watch "Seek buffering" (not "Stalls") go up.
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = { onIntent(PlayerIntent.SeekBy(-10_000)) }) { Text("⏪ 10 s") }
+        Button(onClick = { onIntent(PlayerIntent.SeekBy(60_000)) }) { Text("60 s ⏩") }
+    }
     Spacer(Modifier.height(4.dp))
 }
 
@@ -186,7 +192,11 @@ private fun GuideOverlayPreview() {
         GuideOverlay(
             state = PlayerState(
                 topicIndex = 1,
-                metrics = QoeMetrics(playbackState = "Ready", startupTimeMs = 840, bufferedDurationMs = 21_400),
+                metrics = QoeMetrics(
+                    playbackState = "Ready",
+                    bufferedDurationMs = 21_400,
+                    stalls = StallStats(startupTimeMs = 840),
+                ),
             ),
             onIntent = {},
         )

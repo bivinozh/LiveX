@@ -6,6 +6,7 @@ import com.example.livex.data.SampleStreams
 import com.example.livex.data.Topics
 import com.example.livex.navigation.PlayerRoute
 import com.example.livex.qoe.QoeMetrics
+import com.example.livex.qoe.StallStats
 import com.example.livex.qoe.StatsState
 import com.example.livex.testutil.MainDispatcherRule
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -188,11 +189,11 @@ class PlayerViewModelTest {
 
     @Test
     fun `engine metrics flow into state`() = runTest {
-        engine.metrics.value = QoeMetrics(startupTimeMs = 720)
+        engine.metrics.value = QoeMetrics(stalls = StallStats(startupTimeMs = 720))
 
         advanceUntilIdle()
 
-        assertEquals(720L, viewModel.state.value.metrics.startupTimeMs)
+        assertEquals(720L, viewModel.state.value.metrics.stalls.startupTimeMs)
     }
 
     @Test
@@ -220,6 +221,14 @@ class PlayerViewModelTest {
         engine.stats.value = StatsState(playerState = "Ready", droppedFrames = 4)
 
         assertEquals(StatsState(playerState = "Ready", droppedFrames = 4), viewModel.stats.value)
+    }
+
+    @Test
+    fun `seek by forwards the offset to the engine`() {
+        viewModel.onIntent(PlayerIntent.SeekBy(60_000))
+        viewModel.onIntent(PlayerIntent.SeekBy(-10_000))
+
+        assertEquals(listOf(60_000L, -10_000L), engine.seekOffsets)
     }
 
     @Test

@@ -28,6 +28,12 @@ class FakePlaybackEngine : PlaybackEngine {
     var rejoinLiveEdgeCount = 0
         private set
 
+    val seekOffsets = mutableListOf<Long>()
+
+    override fun seekBy(offsetMs: Long) {
+        seekOffsets += offsetMs
+    }
+
     override fun retry() {
         retryCount++
     }

@@ -15,42 +15,45 @@ class QoeCalculatorTest {
         calculator = QoeCalculator().apply { reset(nowMs = 1_000) }
     }
 
+    // Detailed startup/stall rules are covered by StallTrackerTest; these check the wiring.
+
     @Test
-    fun `startup time is prepare to first frame`() {
+    fun `startup time comes from the stall tracker`() {
         calculator.onFirstFrameRendered(nowMs = 1_850)
 
-        assertEquals(850L, calculator.metrics.startupTimeMs)
+        assertEquals(850L, calculator.metrics.stalls.startupTimeMs)
     }
 
     @Test
-    fun `startup time is measured only once`() {
-        calculator.onFirstFrameRendered(nowMs = 1_850)
-        calculator.onFirstFrameRendered(nowMs = 9_000) // e.g. surface re-attached after rotation
-
-        assertEquals(850L, calculator.metrics.startupTimeMs)
-    }
-
-    @Test
-    fun `initial buffering is not counted as a rebuffer`() {
+    fun `stalls and seek buffering are reported separately`() {
+        calculator.onPlayWhenReadyChanged(true, nowMs = 1_000)
         calculator.onPlaybackStateChanged(Player.STATE_BUFFERING, nowMs = 1_000)
+        calculator.onFirstFrameRendered(nowMs = 1_800)
         calculator.onPlaybackStateChanged(Player.STATE_READY, nowMs = 1_800)
 
-        assertEquals(0, calculator.metrics.rebufferCount)
-        assertEquals(0L, calculator.metrics.rebufferTimeMs)
+        calculator.onPlaybackStateChanged(Player.STATE_BUFFERING, nowMs = 5_000) // stall
+        calculator.onPlaybackStateChanged(Player.STATE_READY, nowMs = 5_400)
+        calculator.onSeek(nowMs = 8_000)
+        calculator.onPlaybackStateChanged(Player.STATE_BUFFERING, nowMs = 8_000) // seek buffering
+        calculator.onPlaybackStateChanged(Player.STATE_READY, nowMs = 9_000)
+
+        val stalls = calculator.metrics.stalls
+        assertEquals(1, stalls.stallCount)
+        assertEquals(400L, stalls.stallTimeMs)
+        assertEquals(1, stalls.seekBufferingCount)
+        assertEquals("Ready", calculator.metrics.playbackState)
     }
 
     @Test
-    fun `buffering after playback started counts rebuffer count and time`() {
+    fun `an ongoing stall grows on each tick`() {
+        calculator.onPlayWhenReadyChanged(true, nowMs = 1_000)
         calculator.onFirstFrameRendered(nowMs = 1_800)
-
+        calculator.onPlaybackStateChanged(Player.STATE_READY, nowMs = 1_800)
         calculator.onPlaybackStateChanged(Player.STATE_BUFFERING, nowMs = 5_000)
-        calculator.onPlaybackStateChanged(Player.STATE_READY, nowMs = 5_400)
-        calculator.onPlaybackStateChanged(Player.STATE_BUFFERING, nowMs = 8_000)
-        calculator.onPlaybackStateChanged(Player.STATE_READY, nowMs = 8_100)
 
-        assertEquals(2, calculator.metrics.rebufferCount)
-        assertEquals(500L, calculator.metrics.rebufferTimeMs)
-        assertEquals("Ready", calculator.metrics.playbackState)
+        calculator.onTick(bufferedDurationMs = 0, nowMs = 6_000)
+
+        assertEquals(1_000L, calculator.metrics.stalls.stallTimeMs)
     }
 
     @Test
@@ -89,7 +92,7 @@ class QoeCalculatorTest {
 
         calculator.reset(nowMs = 10_000)
 
-        assertNull(calculator.metrics.startupTimeMs)
+        assertNull(calculator.metrics.stalls.startupTimeMs)
         assertEquals(0, calculator.metrics.droppedFrames)
     }
 }

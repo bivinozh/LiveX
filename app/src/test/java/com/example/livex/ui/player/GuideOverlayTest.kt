@@ -13,6 +13,7 @@ import com.example.livex.player.PlayerConfig
 import com.example.livex.player.PlayerIntent
 import com.example.livex.player.PlayerState
 import com.example.livex.qoe.QoeMetrics
+import com.example.livex.qoe.StallStats
 import com.example.livex.testutil.performDpadClick
 import com.example.livex.ui.theme.LiveXTheme
 import org.junit.Assert.assertEquals
@@ -74,7 +75,7 @@ class GuideOverlayTest {
 
     @Test
     fun liveMetricsAreDisplayed() {
-        setContent(PlayerState(topicIndex = bufferTopicIndex, metrics = QoeMetrics(startupTimeMs = 840)))
+        setContent(PlayerState(topicIndex = bufferTopicIndex, metrics = QoeMetrics(stalls = StallStats(startupTimeMs = 840))))
 
         composeRule.onNodeWithText("840 ms").assertExists()
     }
@@ -119,6 +120,19 @@ class GuideOverlayTest {
 
         state = PlayerState(isStatsVisible = false)
         composeRule.onNodeWithText("Stats: OFF").assertExists()
+    }
+
+    @Test
+    fun seekButtonsSendSeekBy() {
+        setContent(PlayerState())
+
+        composeRule.onNodeWithText("⏪ 10 s").performDpadClick()
+        composeRule.onNodeWithText("60 s ⏩").performDpadClick()
+
+        assertEquals(
+            listOf<PlayerIntent>(PlayerIntent.SeekBy(-10_000), PlayerIntent.SeekBy(60_000)),
+            sentIntents,
+        )
     }
 
     @Test
