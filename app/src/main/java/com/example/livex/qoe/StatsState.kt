@@ -26,6 +26,10 @@ data class StatsState(
     val playbackSpeed: Float = 1f,
     val droppedFrames: Int = 0,
     val loadErrorCount: Int = 0,
+    /** Startup (VST), stalls, seek buffering, rebuffering ratio. */
+    val stalls: StallStats = StallStats(),
+    /** Buffer level over the last 60 s, for the chart. */
+    val bufferHistory: List<BufferPoint> = emptyList(),
 ) {
     data class Row(val label: String, val value: String)
 
@@ -39,6 +43,10 @@ data class StatsState(
         Row(SPEED, String.format(Locale.US, "%.2f×", playbackSpeed)),
         Row(DROPPED_FRAMES, "$droppedFrames"),
         Row(LOAD_ERRORS, "$loadErrorCount"),
+        Row(STARTUP, stalls.startupTimeMs?.let { "$it ms" } ?: NONE),
+        Row(STALLS, countAndTime(stalls.stallCount, stalls.stallTimeMs) + if (stalls.isStalled) " ●" else ""),
+        Row(REBUFFER_RATIO, stalls.rebufferingRatio?.let { String.format(Locale.US, "%.2f%%", it * 100) } ?: NONE),
+        Row(SEEK_BUFFERING, countAndTime(stalls.seekBufferingCount, stalls.seekBufferingTimeMs)),
     )
 
     /**
@@ -63,10 +71,14 @@ data class StatsState(
         const val SPEED = "Playback speed"
         const val DROPPED_FRAMES = "Dropped frames"
         const val LOAD_ERRORS = "Load errors"
+        const val STARTUP = "Startup (VST)"
+        const val STALLS = "Stalls"
+        const val REBUFFER_RATIO = "Rebuffer ratio"
+        const val SEEK_BUFFERING = "Seek buffering"
 
         private const val NONE = "—"
 
-        fun from(metrics: QoeMetrics, sample: PlayerSample) = StatsState(
+        fun from(metrics: QoeMetrics, sample: PlayerSample, bufferHistory: List<BufferPoint> = emptyList()) = StatsState(
             playerState = metrics.playbackState,
             videoWidth = metrics.videoWidth,
             videoHeight = metrics.videoHeight,
@@ -77,10 +89,13 @@ data class StatsState(
             playbackSpeed = sample.playbackSpeed,
             droppedFrames = metrics.droppedFrames,
             loadErrorCount = metrics.loadErrorCount,
+            stalls = metrics.stalls,
+            bufferHistory = bufferHistory,
         )
 
         private fun mbps(bps: Long) = String.format(Locale.US, "%.2f Mbps", bps / 1_000_000.0)
         private fun seconds(ms: Long) = String.format(Locale.US, "%.1f s", ms / 1000.0)
+        private fun countAndTime(count: Int, ms: Long) = "$count (${seconds(ms)})"
     }
 }
 

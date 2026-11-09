@@ -101,6 +101,7 @@ class PlayerViewModel @Inject constructor(
             PlayerIntent.ToggleStats -> setState { copy(isStatsVisible = !isStatsVisible) }
             PlayerIntent.ToggleOptimization -> toggleOptimization()
             PlayerIntent.OpenManifest -> sendEffect(PlayerEffect.NavigateToManifest(currentState.stream.id))
+            is PlayerIntent.SeekBy -> engine.seekBy(intent.offsetMs)
             PlayerIntent.Retry -> {
                 engine.retry()
                 // Hide the error card right away; player callbacks take over from here.
