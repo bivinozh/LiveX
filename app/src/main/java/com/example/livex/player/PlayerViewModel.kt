@@ -7,6 +7,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import com.example.livex.core.mvi.MviViewModel
 import com.example.livex.data.SampleStreams
+import com.example.livex.qoe.StatsState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.launchIn
@@ -29,6 +30,13 @@ class PlayerViewModel @Inject constructor(
 
     /** Separate from [state]: a Player is a live object, not immutable UI data. */
     val player: StateFlow<Player?> = engine.player
+
+    /**
+     * Stats overlay data, refreshed every 500 ms. Kept out of [state] on purpose: it's high-frequency
+     * telemetry that only the overlay reads, so collecting it there (and only while visible) avoids
+     * recomposing the whole player screen twice a second.
+     */
+    val stats: StateFlow<StatsState> = engine.stats
 
     /**
      * Translates player callbacks into [PlayerState.playback]. Callbacks arrive on the main thread
@@ -90,6 +98,7 @@ class PlayerViewModel @Inject constructor(
                 copy(topicIndex = (topicIndex - 1 + topics.size) % topics.size)
             }
             PlayerIntent.ToggleGuide -> setState { copy(isGuideVisible = !isGuideVisible) }
+            PlayerIntent.ToggleStats -> setState { copy(isStatsVisible = !isStatsVisible) }
             PlayerIntent.ToggleOptimization -> toggleOptimization()
             PlayerIntent.OpenManifest -> sendEffect(PlayerEffect.NavigateToManifest(currentState.stream.id))
             PlayerIntent.Retry -> {

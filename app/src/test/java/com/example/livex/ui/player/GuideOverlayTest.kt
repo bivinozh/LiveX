@@ -111,6 +111,17 @@ class GuideOverlayTest {
     }
 
     @Test
+    fun statsButton_reflectsVisibility_andSendsToggleStats() {
+        setContent(PlayerState(isStatsVisible = true))
+
+        composeRule.onNodeWithText("Stats: ON").performDpadClick()
+        assertEquals(listOf<PlayerIntent>(PlayerIntent.ToggleStats), sentIntents)
+
+        state = PlayerState(isStatsVisible = false)
+        composeRule.onNodeWithText("Stats: OFF").assertExists()
+    }
+
+    @Test
     fun hiddenGuide_showsOnlyShowGuideButton() {
         setContent(PlayerState(isGuideVisible = false))
 

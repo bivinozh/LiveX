@@ -17,6 +17,8 @@ data class PlayerState(
     val config: PlayerConfig = PlayerConfig(),
     val metrics: QoeMetrics = QoeMetrics(),
     val isGuideVisible: Boolean = true,
+    /** Stats overlay toggle. The stats themselves stream separately (PlayerViewModel.stats). */
+    val isStatsVisible: Boolean = true,
     /** Player.Listener events mapped for the UI: spinner on Buffering, error card on Error. */
     val playback: PlayerUiState = PlayerUiState.Idle,
 ) : UiState {
@@ -30,6 +32,7 @@ sealed interface PlayerIntent : UiIntent {
     data object PreviousTopic : PlayerIntent
     data object ToggleOptimization : PlayerIntent
     data object ToggleGuide : PlayerIntent
+    data object ToggleStats : PlayerIntent
     data object OpenManifest : PlayerIntent
 
     /** Retry button on the error card. */

@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -60,6 +61,12 @@ fun PlayerScreen(
             onRelease = { playerView -> playerView.player = null },
             modifier = Modifier.fillMaxSize(),
         )
+
+        if (state.isStatsVisible) {
+            // Collected only while visible: when hidden, nothing recomposes on the 500 ms ticks.
+            val stats by viewModel.stats.collectAsStateWithLifecycle()
+            StatsOverlay(stats, Modifier.align(Alignment.TopStart).padding(24.dp))
+        }
 
         GuideOverlay(state = state, onIntent = viewModel::onIntent)
 

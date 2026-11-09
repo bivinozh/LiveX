@@ -17,6 +17,8 @@ data class QoeMetrics(
     val requestCount: Int = 0,
     val totalLoadTimeMs: Long = 0,
     val bytesLoaded: Long = 0,
+    /** Failed segment/manifest requests. ExoPlayer retries these; many in a row end in a playback error. */
+    val loadErrorCount: Int = 0,
 )
 
 enum class MetricKey(val label: String) {

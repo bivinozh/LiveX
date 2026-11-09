@@ -3,6 +3,7 @@ package com.example.livex.player
 import androidx.media3.common.Player
 import com.example.livex.data.Stream
 import com.example.livex.qoe.QoeMetrics
+import com.example.livex.qoe.StatsState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -10,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 class FakePlaybackEngine : PlaybackEngine {
     override val player: StateFlow<Player?> = MutableStateFlow(null)
     override val metrics = MutableStateFlow(QoeMetrics())
+    override val stats = MutableStateFlow(StatsState())
     override var currentPositionMs: Long = 0
 
     val startedConfigs = mutableListOf<PlayerConfig>()
