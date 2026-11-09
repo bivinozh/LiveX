@@ -27,6 +27,7 @@ import com.example.livex.player.PlayerViewModel
 @Composable
 fun PlayerScreen(
     onOpenManifest: (streamId: String) -> Unit,
+    onOpenBufferSettings: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: PlayerViewModel = hiltViewModel(),
 ) {
@@ -43,6 +44,8 @@ fun PlayerScreen(
             // Navigating away stops this destination: the lifecycle effect pauses playback (ON_STOP)
             // and resumes it when Back returns here (ON_START).
             is PlayerEffect.NavigateToManifest -> onOpenManifest(effect.streamId)
+            // Same pause/resume as the manifest viewer; saved settings are applied on return.
+            PlayerEffect.NavigateToBufferSettings -> onOpenBufferSettings()
         }
     }
 

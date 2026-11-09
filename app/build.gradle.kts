@@ -86,6 +86,9 @@ dependencies {
     // Navigation (type-safe routes use kotlinx.serialization)
     implementation(libs.androidx.navigation.compose)
 
+    // Settings persistence (buffer tuning)
+    implementation(libs.androidx.datastore.preferences)
+
     // Local tests (JVM + Robolectric)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

@@ -5,6 +5,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.livex.data.SampleStreams
+import com.example.livex.settings.FakeBufferSettingsRepository
 import com.example.livex.testutil.MainDispatcherRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -33,6 +34,7 @@ class PlayerViewModelPlaybackStateTest {
         engine = FakePlaybackEngine()
         viewModel = PlayerViewModel(
             engine,
+            FakeBufferSettingsRepository(),
             SavedStateHandle(mapOf(PlayerViewModel.KEY_STREAM_ID to SampleStreams.liveHls.id)),
         )
     }

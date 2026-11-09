@@ -9,6 +9,8 @@ import com.example.livex.network.ThrottleMode
 import com.example.livex.qoe.QoeMetrics
 import com.example.livex.qoe.StallStats
 import com.example.livex.qoe.StatsState
+import com.example.livex.settings.BufferPreset
+import com.example.livex.settings.FakeBufferSettingsRepository
 import com.example.livex.testutil.MainDispatcherRule
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -26,20 +28,22 @@ class PlayerViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private lateinit var engine: FakePlaybackEngine
+    private lateinit var settings: FakeBufferSettingsRepository
     private lateinit var savedState: SavedStateHandle
     private lateinit var viewModel: PlayerViewModel
 
     @Before
     fun setUp() {
         engine = FakePlaybackEngine()
+        settings = FakeBufferSettingsRepository()
         savedState = SavedStateHandle(mapOf(PlayerViewModel.KEY_STREAM_ID to SampleStreams.bigBuckBunny.id))
-        viewModel = PlayerViewModel(engine, savedState)
+        viewModel = PlayerViewModel(engine, settings, savedState)
     }
 
     /** A new ViewModel created from [saved] (navigation argument and/or state restored after process death). */
     private fun create(saved: Map<String, Any?>): PlayerViewModel {
         engine = FakePlaybackEngine()
-        return PlayerViewModel(engine, SavedStateHandle(saved))
+        return PlayerViewModel(engine, settings, SavedStateHandle(saved))
     }
 
     private fun goToTopic(index: Int) = repeat(index) { viewModel.onIntent(PlayerIntent.NextTopic) }
@@ -244,6 +248,60 @@ class PlayerViewModelTest {
         assertEquals(ThrottleMode.KBPS_800, viewModel.state.value.throttleMode)
         assertEquals(listOf(ThrottleMode.KBPS_800), engine.throttleModes)
         assertEquals("no rebuild", 1, engine.startedConfigs.size)
+    }
+
+    // --- Buffer settings (DataStore) ---
+
+    @Test
+    fun `loading saved settings does not restart a player that uses Media3 defaults`() = runTest {
+        // Already in DataStore before the player screen opens.
+        settings = FakeBufferSettingsRepository(BufferPreset.STABLE_VOD.settings)
+        val vm = create(mapOf(PlayerViewModel.KEY_STREAM_ID to SampleStreams.bigBuckBunny.id))
+
+        advanceUntilIdle()
+
+        assertEquals("no rebuild", 1, engine.startedConfigs.size)
+        assertEquals(BufferPreset.STABLE_VOD.settings, vm.state.value.config.buffer)
+        assertEquals(false, vm.state.value.config.tunedBuffer)
+    }
+
+    @Test
+    fun `changed settings switch tuning on and rebuild the player`() = runTest {
+        advanceUntilIdle() // initial load
+
+        settings.settings.value = BufferPreset.LOW_MEMORY_TV.settings
+        advanceUntilIdle()
+
+        val rebuilt = engine.startedConfigs.last()
+        assertEquals(2, engine.startedConfigs.size)
+        assertTrue(rebuilt.tunedBuffer)
+        assertEquals(BufferPreset.LOW_MEMORY_TV.settings, rebuilt.buffer)
+        assertNull("same stream: the engine keeps the position", engine.startPositions.last())
+    }
+
+    @Test
+    fun `settings changed while the player is hidden are applied when it comes back`() = runTest {
+        advanceUntilIdle()
+        viewModel.onIntent(PlayerIntent.LifecycleStop) // settings screen opened
+
+        settings.settings.value = BufferPreset.STABLE_VOD.settings
+        advanceUntilIdle()
+        assertEquals("no rebuild while hidden (it would start playing)", 1, engine.startedConfigs.size)
+
+        viewModel.onIntent(PlayerIntent.LifecycleStart)
+
+        assertEquals(2, engine.startedConfigs.size)
+        assertEquals(BufferPreset.STABLE_VOD.settings, engine.startedConfigs.last().buffer)
+        assertEquals("rebuild replaces resume", 0, engine.resumeCount)
+    }
+
+    @Test
+    fun `open buffer settings requests navigation`() = runTest {
+        viewModel.effects.test {
+            viewModel.onIntent(PlayerIntent.OpenBufferSettings)
+
+            assertEquals(PlayerEffect.NavigateToBufferSettings, awaitItem())
+        }
     }
 
     @Test

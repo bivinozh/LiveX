@@ -1,9 +1,9 @@
 package com.example.livex.data
 
 import com.example.livex.player.AbrProfile
-import com.example.livex.player.BufferProfile
 import com.example.livex.player.OptimizationToggle
 import com.example.livex.qoe.MetricKey
+import com.example.livex.settings.BufferSettings
 
 /** A Default-vs-Optimized demo the viewer can switch live. */
 data class Optimization(
@@ -23,9 +23,6 @@ data class Topic(
 )
 
 object Topics {
-
-    private fun BufferProfile.summary() =
-        "start after ${bufferForPlaybackMs} ms, keep ${minBufferMs / 1000}–${maxBufferMs / 1000} s buffered"
 
     val hlsBasics = Topic(
         title = "HLS & DASH playback basics",
@@ -51,12 +48,13 @@ object Topics {
             "minBufferMs / maxBufferMs: the buffer target. Lower = less memory and data.",
             "bufferForPlaybackAfterRebufferMs: media needed to resume after a stall.",
             "Switch the optimization and compare Startup time and Buffered ahead.",
+            "Edit buffer settings: sliders + presets, saved in DataStore. Saving rebuilds the player at the same position.",
         ),
         metrics = listOf(MetricKey.STARTUP, MetricKey.BUFFERED, MetricKey.REBUFFERS),
         optimization = Optimization(
             toggle = OptimizationToggle.BUFFER,
-            defaultLabel = "Media3 default: ${BufferProfile.Default.summary()}",
-            optimizedLabel = "Tuned: ${BufferProfile.Tuned.summary()}",
+            defaultLabel = "Media3 default: ${BufferSettings.MEDIA3_DEFAULT.summary()}",
+            optimizedLabel = "Your buffer settings (default: Fast start, ${BufferSettings.DEFAULT.summary()})",
             tradeOff = "A smaller buffer starts faster and uses less memory, but gives less " +
                 "protection against network dips, so rebuffers become more likely.",
         ),

@@ -30,6 +30,7 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.example.livex.data.Optimization
+import com.example.livex.player.OptimizationToggle
 import com.example.livex.player.PlayerIntent
 import com.example.livex.player.PlayerState
 import com.example.livex.qoe.MetricKey
@@ -147,6 +148,9 @@ private fun OptimizationSection(optimization: Optimization, enabled: Boolean, on
         color = Muted,
     )
     BodyText("Trade-off: ${optimization.tradeOff}", color = Muted)
+    if (optimization.toggle == OptimizationToggle.BUFFER) {
+        Button(onClick = { onIntent(PlayerIntent.OpenBufferSettings) }) { Text("Edit buffer settings") }
+    }
 }
 
 @Composable
