@@ -1,6 +1,5 @@
 package com.example.livex.qoe
 
-import com.example.livex.player.abr.QualitySwitch
 import java.util.Locale
 
 /**
@@ -31,8 +30,6 @@ data class StatsState(
     val stalls: StallStats = StallStats(),
     /** Buffer level over the last 60 s, for the chart. */
     val bufferHistory: List<BufferPoint> = emptyList(),
-    /** Most recent ABR rendition changes, oldest first. */
-    val recentSwitches: List<QualitySwitch> = emptyList(),
 ) {
     data class Row(val label: String, val value: String)
 
@@ -81,12 +78,7 @@ data class StatsState(
 
         private const val NONE = "—"
 
-        fun from(
-            metrics: QoeMetrics,
-            sample: PlayerSample,
-            bufferHistory: List<BufferPoint> = emptyList(),
-            recentSwitches: List<QualitySwitch> = emptyList(),
-        ) = StatsState(
+        fun from(metrics: QoeMetrics, sample: PlayerSample, bufferHistory: List<BufferPoint> = emptyList()) = StatsState(
             playerState = metrics.playbackState,
             videoWidth = metrics.videoWidth,
             videoHeight = metrics.videoHeight,
@@ -99,7 +91,6 @@ data class StatsState(
             loadErrorCount = metrics.loadErrorCount,
             stalls = metrics.stalls,
             bufferHistory = bufferHistory,
-            recentSwitches = recentSwitches,
         )
 
         private fun mbps(bps: Long) = String.format(Locale.US, "%.2f Mbps", bps / 1_000_000.0)

@@ -71,10 +71,6 @@ data class BufferSettings(
     }
 }
 
-/** "500 ms" / "2.5 s". */
-fun formatDuration(valueMs: Int): String =
-    if (valueMs < 1_000) "$valueMs ms" else String.format(Locale.US, "%.1f s", valueMs / 1000.0)
-
 @OptIn(UnstableApi::class)
 private fun media3Defaults() = BufferSettings(
     minBufferMs = DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
@@ -85,14 +81,14 @@ private fun media3Defaults() = BufferSettings(
 
 /** The four sliders: range, D-pad step and the explanations shown on the settings screen. */
 enum class BufferField(
-    override val label: String,
-    override val range: IntRange,
-    override val step: Int,
+    val label: String,
+    val range: IntRange,
+    val step: Int,
     /** Water-tank analogy. */
     val analogy: String,
     /** What turning it up/down costs. */
     val tradeOff: String,
-) : SliderSpec {
+) {
     MIN_BUFFER(
         label = "minBufferMs",
         range = 1_000..120_000,
@@ -137,7 +133,8 @@ enum class BufferField(
         PLAYBACK_AFTER_REBUFFER -> settings.bufferForPlaybackAfterRebufferMs
     }
 
-    override fun format(value: Int): String = formatDuration(value)
+    fun format(valueMs: Int): String =
+        if (valueMs < 1_000) "$valueMs ms" else String.format(Locale.US, "%.1f s", valueMs / 1000.0)
 }
 
 /** Ready-made settings for common situations. */

@@ -68,9 +68,6 @@ object Topics {
             "Watch Resolution and Variant bitrate climb as the bandwidth estimate builds up.",
             "TrackSelectionParameters set limits on which variants ABR may choose.",
             "Capping quality to what the screen or user needs saves data and CDN cost.",
-            "Quality picker: Auto = AdaptiveTrackSelection; a height = TrackSelectionOverride (manual).",
-            "Edit ABR settings: up/down-switch buffer thresholds, bandwidth fraction, initial estimate.",
-            "Every switch (from, to, reason, bandwidth, buffer) is in the stats overlay and Logcat (LiveX-ABR).",
         ),
         metrics = listOf(
             MetricKey.RESOLUTION, MetricKey.BITRATE, MetricKey.SWITCHES,

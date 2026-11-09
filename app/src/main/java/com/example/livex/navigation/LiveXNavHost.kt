@@ -7,7 +7,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.livex.feature.home.HomeScreen
 import com.example.livex.manifest.ManifestScreen
-import com.example.livex.settings.AbrSettingsScreen
 import com.example.livex.settings.BufferSettingsScreen
 import com.example.livex.ui.player.PlayerScreen
 import kotlinx.serialization.Serializable
@@ -30,10 +29,6 @@ data class ManifestRoute(val streamId: String)
 @Serializable
 data object BufferSettingsRoute
 
-/** AdaptiveTrackSelection + bandwidth meter settings (DataStore). */
-@Serializable
-data object AbrSettingsRoute
-
 @Composable
 fun LiveXNavHost(navController: NavHostController = rememberNavController()) {
     NavHost(navController = navController, startDestination = HomeRoute) {
@@ -46,11 +41,7 @@ fun LiveXNavHost(navController: NavHostController = rememberNavController()) {
             PlayerScreen(
                 onOpenManifest = { streamId -> navController.navigate(ManifestRoute(streamId)) },
                 onOpenBufferSettings = { navController.navigate(BufferSettingsRoute) },
-                onOpenAbrSettings = { navController.navigate(AbrSettingsRoute) },
             )
-        }
-        composable<AbrSettingsRoute> {
-            AbrSettingsScreen(onSaved = { navController.popBackStack() })
         }
         composable<BufferSettingsRoute> {
             // Saved: back to the player, which rebuilds with the new LoadControl on ON_START.

@@ -3,7 +3,6 @@ package com.example.livex.player
 import androidx.media3.common.Player
 import com.example.livex.data.Stream
 import com.example.livex.network.ThrottleMode
-import com.example.livex.player.abr.QualityState
 import com.example.livex.qoe.QoeMetrics
 import com.example.livex.qoe.StatsState
 import kotlinx.coroutines.flow.StateFlow
@@ -37,12 +36,6 @@ interface PlaybackEngine {
 
     /** Resumes playback only if it was playing when [pause] was called. */
     fun resume()
-
-    /** Video qualities of the current stream and the manual choice (null = Auto). */
-    val quality: StateFlow<QualityState>
-
-    /** Manual quality (TrackSelectionOverride) or Auto when [height] is null. No rebuild. */
-    fun selectQuality(height: Int?)
 
     /** Network throttle simulator: applies to the next bytes read, without rebuilding the player. */
     fun setThrottleMode(mode: ThrottleMode)

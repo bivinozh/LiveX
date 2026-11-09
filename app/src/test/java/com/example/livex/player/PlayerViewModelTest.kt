@@ -9,11 +9,7 @@ import com.example.livex.network.ThrottleMode
 import com.example.livex.qoe.QoeMetrics
 import com.example.livex.qoe.StallStats
 import com.example.livex.qoe.StatsState
-import com.example.livex.player.abr.QualityState
-import com.example.livex.player.abr.VideoQuality
-import com.example.livex.settings.AbrSettings
 import com.example.livex.settings.BufferPreset
-import com.example.livex.settings.FakeAbrSettingsRepository
 import com.example.livex.settings.FakeBufferSettingsRepository
 import com.example.livex.testutil.MainDispatcherRule
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -33,7 +29,6 @@ class PlayerViewModelTest {
 
     private lateinit var engine: FakePlaybackEngine
     private lateinit var settings: FakeBufferSettingsRepository
-    private lateinit var abrSettings: FakeAbrSettingsRepository
     private lateinit var savedState: SavedStateHandle
     private lateinit var viewModel: PlayerViewModel
 
@@ -41,15 +36,14 @@ class PlayerViewModelTest {
     fun setUp() {
         engine = FakePlaybackEngine()
         settings = FakeBufferSettingsRepository()
-        abrSettings = FakeAbrSettingsRepository()
         savedState = SavedStateHandle(mapOf(PlayerViewModel.KEY_STREAM_ID to SampleStreams.bigBuckBunny.id))
-        viewModel = PlayerViewModel(engine, settings, abrSettings, savedState)
+        viewModel = PlayerViewModel(engine, settings, savedState)
     }
 
     /** A new ViewModel created from [saved] (navigation argument and/or state restored after process death). */
     private fun create(saved: Map<String, Any?>): PlayerViewModel {
         engine = FakePlaybackEngine()
-        return PlayerViewModel(engine, settings, abrSettings, SavedStateHandle(saved))
+        return PlayerViewModel(engine, settings, SavedStateHandle(saved))
     }
 
     private fun goToTopic(index: Int) = repeat(index) { viewModel.onIntent(PlayerIntent.NextTopic) }
@@ -307,55 +301,6 @@ class PlayerViewModelTest {
             viewModel.onIntent(PlayerIntent.OpenBufferSettings)
 
             assertEquals(PlayerEffect.NavigateToBufferSettings, awaitItem())
-        }
-    }
-
-    // --- Track selection & ABR ---
-
-    @Test
-    fun `available qualities flow from the engine into state`() = runTest {
-        val qualities = QualityState(options = listOf(VideoQuality(720, 1280, 2_100_000, 0, 1)))
-        engine.quality.value = qualities
-
-        advanceUntilIdle()
-
-        assertEquals(qualities, viewModel.state.value.quality)
-    }
-
-    @Test
-    fun `choosing a quality goes to the engine without a rebuild`() {
-        viewModel.onIntent(PlayerIntent.SelectQuality(480))
-        viewModel.onIntent(PlayerIntent.SelectQuality(null)) // back to Auto
-
-        assertEquals(listOf(480, null), engine.selectedQualities)
-        assertEquals(1, engine.startedConfigs.size)
-    }
-
-    @Test
-    fun `default ABR settings load without a rebuild`() = runTest {
-        advanceUntilIdle()
-
-        assertEquals(1, engine.startedConfigs.size)
-    }
-
-    @Test
-    fun `changed ABR settings rebuild the player with them`() = runTest {
-        advanceUntilIdle()
-        val custom = AbrSettings(4_000, 12_000, 85, 3_000)
-
-        abrSettings.settings.value = custom
-        advanceUntilIdle()
-
-        assertEquals(2, engine.startedConfigs.size)
-        assertEquals(custom, engine.startedConfigs.last().abr)
-    }
-
-    @Test
-    fun `open ABR settings requests navigation`() = runTest {
-        viewModel.effects.test {
-            viewModel.onIntent(PlayerIntent.OpenAbrSettings)
-
-            assertEquals(PlayerEffect.NavigateToAbrSettings, awaitItem())
         }
     }
 
