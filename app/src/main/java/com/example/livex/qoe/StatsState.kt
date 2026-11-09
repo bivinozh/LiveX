@@ -1,5 +1,7 @@
 package com.example.livex.qoe
 
+import com.example.livex.player.ads.AdEventLog
+import com.example.livex.player.ads.AdState
 import java.util.Locale
 
 /**
@@ -32,6 +34,10 @@ data class StatsState(
     val stalls: StallStats = StallStats(),
     /** Buffer level over the last 60 s, for the chart. */
     val bufferHistory: List<BufferPoint> = emptyList(),
+    /** Ad being played right now (client-side ads). */
+    val ad: AdState = AdState(),
+    /** Recent IMA ad events (loaded, started, quartiles, completed, errors), oldest first. */
+    val adEvents: List<AdEventLog.Entry> = emptyList(),
 ) {
     data class Row(val label: String, val value: String)
 
@@ -50,6 +56,7 @@ data class StatsState(
         Row(STALLS, countAndTime(stalls.stallCount, stalls.stallTimeMs) + if (stalls.isStalled) " ●" else ""),
         Row(REBUFFER_RATIO, stalls.rebufferingRatio?.let { String.format(Locale.US, "%.2f%%", it * 100) } ?: NONE),
         Row(SEEK_BUFFERING, countAndTime(stalls.seekBufferingCount, stalls.seekBufferingTimeMs)),
+        Row(AD, ad.shortLabel ?: NONE),
     )
 
     /**
@@ -86,6 +93,7 @@ data class StatsState(
         const val BUFFER = "Buffer ahead"
         const val LIVE_OFFSET = "Live offset"
         const val TARGET_OFFSET = "Target offset"
+        const val AD = "Ad"
         const val SPEED = "Playback speed"
         const val DROPPED_FRAMES = "Dropped frames"
         const val LOAD_ERRORS = "Load errors"
@@ -96,13 +104,20 @@ data class StatsState(
 
         private const val NONE = "—"
 
-        fun from(metrics: QoeMetrics, sample: PlayerSample, bufferHistory: List<BufferPoint> = emptyList()) = StatsState(
+        fun from(
+            metrics: QoeMetrics,
+            sample: PlayerSample,
+            bufferHistory: List<BufferPoint> = emptyList(),
+            adEvents: List<AdEventLog.Entry> = emptyList(),
+        ) = StatsState(
             playerState = metrics.playbackState,
             videoWidth = metrics.videoWidth,
             videoHeight = metrics.videoHeight,
             videoBitrateBps = metrics.videoBitrateBps,
             bandwidthEstimateBps = metrics.bandwidthEstimateBps,
             bufferedDurationMs = sample.bufferedDurationMs,
+            ad = sample.ad,
+            adEvents = adEvents,
             liveOffsetMs = sample.liveOffsetMs,
             targetOffsetMs = sample.targetOffsetMs,
             playbackSpeed = sample.playbackSpeed,
@@ -125,4 +140,6 @@ data class PlayerSample(
     val playbackSpeed: Float,
     /** Resolved target live offset (MediaItem LiveConfiguration + manifest); null for VOD. */
     val targetOffsetMs: Long? = null,
+    /** player.isPlayingAd + which ad of which break. */
+    val ad: AdState = AdState(),
 )

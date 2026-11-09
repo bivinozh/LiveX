@@ -4,6 +4,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.example.livex.player.ads.AdEventLog
 import com.example.livex.qoe.BufferPoint
 import com.example.livex.qoe.StatsState
 import com.example.livex.ui.theme.LiveXTheme
@@ -35,6 +36,18 @@ class StatsOverlayTest {
         composeRule.onNodeWithText("1920×1080").assertExists()
         composeRule.onNodeWithText("8.0 s").assertExists()
         composeRule.onNodeWithText("7").assertExists()
+    }
+
+    @Test
+    fun showsRecentAdEvents_errorsIncluded() {
+        val events = listOf(
+            AdEventLog.Entry("STARTED · pre-roll · ad 1/1 · 10 s", isError = false),
+            AdEventLog.Entry("ERROR · VAST_LOAD_TIMEOUT (301)", isError = true),
+        )
+        composeRule.setContent { LiveXTheme { StatsOverlay(StatsState(adEvents = events)) } }
+
+        composeRule.onNodeWithText("Ad events").assertExists()
+        events.forEach { composeRule.onNodeWithText(it.text).assertExists() }
     }
 
     @Test

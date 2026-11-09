@@ -5,6 +5,8 @@ import app.cash.turbine.test
 import com.example.livex.data.SampleStreams
 import com.example.livex.data.Topics
 import com.example.livex.navigation.PlayerRoute
+import com.example.livex.player.ads.AdBreakKind
+import com.example.livex.player.ads.AdState
 import com.example.livex.player.live.LiveLatency
 import com.example.livex.player.live.LiveWindow
 import com.example.livex.network.ThrottleMode
@@ -365,6 +367,18 @@ class PlayerViewModelTest {
         engine.live.value = window
 
         assertEquals(window, viewModel.live.value)
+    }
+
+    // --- Ads ---
+
+    @Test
+    fun `ad state flows from the engine into state`() = runTest {
+        val playing = AdState(isPlayingAd = true, breakKind = AdBreakKind.PRE_ROLL, adIndexInBreak = 0, adsInBreak = 1)
+        engine.ad.value = playing
+
+        advanceUntilIdle()
+
+        assertEquals(playing, viewModel.state.value.ad)
     }
 
     @Test

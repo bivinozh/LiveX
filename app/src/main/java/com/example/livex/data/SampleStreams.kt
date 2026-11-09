@@ -10,6 +10,11 @@ data class Stream(
     /** MimeTypes.APPLICATION_M3U8 (HLS) or MimeTypes.APPLICATION_MPD (DASH). */
     val mimeType: String,
     val isLive: Boolean,
+    /**
+     * VAST or VMAP ad tag for client-side ads (MediaItem.AdsConfiguration -> ImaAdsLoader).
+     * Null = no ads.
+     */
+    val adTagUri: String? = null,
 ) {
     val format: String
         get() = when (mimeType) {
@@ -20,7 +25,7 @@ data class Stream(
 
     /** Short label for the UI, e.g. "HLS · VOD". */
     val formatLabel: String
-        get() = "$format · ${if (isLive) "Live" else "VOD"}"
+        get() = "$format · ${if (isLive) "Live" else "VOD"}" + if (adTagUri != null) " · Ads" else ""
 }
 
 /** Public test streams (all checked to respond at the time of writing). */
@@ -79,7 +84,50 @@ object SampleStreams {
         isLive = true,
     )
 
-    val all: List<Stream> = listOf(bigBuckBunny, tearsOfSteelHls, tearsOfSteelDash, liveHls, dashIfLivesim)
+    // --- Client-side ads (Google IMA sample tags; content = Big Buck Bunny HLS) ---
+
+    private const val IMA_SAMPLES = "https://pubads.g.doubleclick.net/gampad/ads?iu=/21775744923/external"
+
+    private fun withAds(id: String, title: String, adTagUri: String) =
+        bigBuckBunny.copy(id = id, title = title, adTagUri = adTagUri)
+
+    /** VAST 3.0: one 10 s linear ad. A plain VAST tag has no schedule, so IMA plays it as a pre-roll. */
+    val adsPreRoll = withAds(
+        id = "bbb-ads-pre",
+        title = "Big Buck Bunny + pre-roll (VAST)",
+        adTagUri = "$IMA_SAMPLES/single_ad_samples&sz=640x480&cust_params=sample_ct%3Dlinear" +
+            "&ciu_szs=300x250%2C728x90&gdfp_req=1&output=vast&unviewed_position_start=1&env=vp&impl=s&correlator=",
+    )
+
+    /** VMAP: ad breaks at start, 00:00:15 and end. Each break points to its own VAST. */
+    val adsVmapPreMidPost = withAds(
+        id = "bbb-ads-vmap",
+        title = "Big Buck Bunny + pre/mid/post (VMAP)",
+        adTagUri = "$IMA_SAMPLES/vmap_ad_samples&sz=640x480&cust_params=sample_ar%3Dpremidpost" +
+            "&ciu_szs=300x250&gdfp_req=1&ad_rule=1&output=vmap&unviewed_position_start=1&env=vp&impl=s" +
+            "&cmsid=496&vid=short_onecue&correlator=",
+    )
+
+    /** VMAP with a single break at "end": plays after the content (use 60 s ⏩ to get there). */
+    val adsPostRoll = withAds(
+        id = "bbb-ads-post",
+        title = "Big Buck Bunny + post-roll (VMAP)",
+        adTagUri = "$IMA_SAMPLES/vmap_ad_samples&sz=640x480&cust_params=sample_ar%3Dpostonly" +
+            "&ciu_szs=300x250&gdfp_req=1&ad_rule=1&output=vmap&unviewed_position_start=1&env=vp&impl=s&correlator=",
+    )
+
+    /** VAST Wrapper that redirects to an invalid tag: the ad fails, content must still play. */
+    val adsError = withAds(
+        id = "bbb-ads-error",
+        title = "Big Buck Bunny + broken ad (VAST error)",
+        adTagUri = "$IMA_SAMPLES/single_ad_samples&sz=640x480&cust_params=sample_ct%3Dredirecterror" +
+            "&ciu_szs=300x250%2C728x90&gdfp_req=1&output=vast&unviewed_position_start=1&env=vp&impl=s&nofb=1&correlator=",
+    )
+
+    val all: List<Stream> = listOf(
+        bigBuckBunny, tearsOfSteelHls, tearsOfSteelDash, liveHls, dashIfLivesim,
+        adsPreRoll, adsVmapPreMidPost, adsPostRoll, adsError,
+    )
 
     fun byId(id: String?): Stream? = all.firstOrNull { it.id == id }
 }

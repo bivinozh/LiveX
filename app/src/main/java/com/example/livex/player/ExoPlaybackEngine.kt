@@ -5,6 +5,7 @@ import android.content.pm.ApplicationInfo
 import android.os.SystemClock
 import androidx.annotation.OptIn
 import androidx.media3.common.C
+import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Timeline
 import androidx.media3.common.Player
@@ -21,6 +22,10 @@ import com.example.livex.data.Stream
 import com.example.livex.qoe.QoeMetrics
 import com.example.livex.qoe.QoeTracker
 import com.example.livex.network.NetworkThrottle
+import androidx.media3.ui.PlayerView
+import com.example.livex.player.ads.AdBreakKind
+import com.example.livex.player.ads.AdState
+import com.example.livex.player.ads.ImaAdsController
 import com.example.livex.player.live.LiveWindow
 import com.example.livex.network.ThrottleMode
 import com.example.livex.network.ThrottlingDataSource
@@ -69,14 +74,21 @@ class ExoPlaybackEngine @Inject constructor(
     private val _live = MutableStateFlow<LiveWindow?>(null)
     override val live: StateFlow<LiveWindow?> = _live.asStateFlow()
     private val window = Timeline.Window()
+    private val period = Timeline.Period()
+
+    // Client-side ads (IMA). One loader for the engine's lifetime; attached to each new player.
+    private val ads = ImaAdsController(context)
+    private val _ad = MutableStateFlow(AdState())
+    override val ad: StateFlow<AdState> = _ad.asStateFlow()
 
     /** One simulated link for the engine's lifetime: survives player rebuilds, switchable at runtime. */
     private val throttle = NetworkThrottle()
 
     private val isDebuggable = context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
     override val stats: StateFlow<StatsState> = _stats.asStateFlow()
+    /** Content position: during an ad, currentPosition is the position INSIDE the ad. */
     override val currentPositionMs: Long
-        get() = _player.value?.currentPosition ?: 0L
+        get() = _player.value?.contentPosition ?: 0L
 
     init {
         // Buffer, live offset and speed change continuously without callbacks, so sample them.
@@ -90,11 +102,13 @@ class ExoPlaybackEngine @Inject constructor(
                     tracker.onTick(sample.bufferedDurationMs, nowMs)
                     val metrics = tracker.metrics.value
                     bufferHistory.add(BufferPoint(nowMs, sample.bufferedDurationMs, metrics.stalls.isStalled))
-                    _stats.value = StatsState.from(metrics, sample, bufferHistory.points)
+                    _stats.value = StatsState.from(metrics, sample, bufferHistory.points, ads.events.value)
                     _live.value = current.liveWindow()
+                    _ad.value = sample.ad
                 } else {
                     _stats.value = StatsState()
                     _live.value = null
+                    _ad.value = AdState()
                 }
                 delay(STATS_INTERVAL)
             }
@@ -108,7 +122,29 @@ class ExoPlaybackEngine @Inject constructor(
         liveOffsetMs = currentLiveOffset.takeIf { isCurrentMediaItemLive && it != C.TIME_UNSET },
         playbackSpeed = playbackParameters.speed,
         targetOffsetMs = currentWindowOrNull()?.liveConfiguration?.targetOffsetMs?.takeIf { it != C.TIME_UNSET },
+        ad = adState(),
     )
+
+    /**
+     * Which ad of which break is playing. The ad schedule lives in the period's AdPlaybackState
+     * (filled in by ImaAdsLoader from the VAST/VMAP response).
+     */
+    private fun Player.adState(): AdState {
+        if (!isPlayingAd || currentTimeline.isEmpty) return AdState()
+        currentTimeline.getPeriod(currentPeriodIndex, period)
+        val group = currentAdGroupIndex
+        return AdState(
+            isPlayingAd = true,
+            breakKind = AdBreakKind.fromAdGroupTimeUs(period.getAdGroupTimeUs(group)),
+            adIndexInBreak = currentAdIndexInAdGroup,
+            adsInBreak = period.getAdCountInAdGroup(group),
+            remainingMs = if (duration == C.TIME_UNSET) null else (duration - currentPosition).coerceAtLeast(0),
+        )
+    }
+
+    override fun setAdView(view: PlayerView?) {
+        ads.adViewProvider.playerView = view
+    }
 
     /** The current live window, or null for VOD / before the first manifest is parsed. */
     private fun Player.currentWindowOrNull(): Timeline.Window? {
@@ -135,12 +171,15 @@ class ExoPlaybackEngine @Inject constructor(
         // An explicit position wins (restore after process death). Otherwise resume only when
         // rebuilding the same VOD (optimization switch); a new stream starts from the beginning,
         // and live always joins at the default live position.
-        val resumePositionMs = startPositionMs ?: _player.value?.currentPosition
+        val resumePositionMs = startPositionMs ?: _player.value?.contentPosition
             ?.takeIf { stream == currentStream && !stream.isLive }
         currentStream = stream
         releasePlayer()
 
         val newPlayer = buildPlayer(config)
+        // IMA must know the player BEFORE it is prepared (it listens for the timeline and positions).
+        ads.setPlayer(newPlayer)
+        ads.clearEvents()
         newPlayer.addAnalyticsListener(tracker)
         // Debug builds: log every load, format switch and state change to logcat (tag "EventLogger").
         // The quickest way to see what ABR downloads (downstreamFormat) vs. what plays (videoInputFormat).
@@ -156,6 +195,9 @@ class ExoPlaybackEngine @Inject constructor(
                 // Live latency control: target offset + the speed range LivePlaybackSpeedControl may
                 // use to hold it. Overrides the manifest's own suggestion (e.g. DASH ServiceDescription).
                 if (stream.isLive) setLiveConfiguration(config.liveLatency.liveConfiguration())
+                // Client-side ads: DefaultMediaSourceFactory sees the AdsConfiguration and wraps the
+                // content in an AdsMediaSource driven by ImaAdsLoader.
+                stream.adTagUri?.let { setAdsConfiguration(MediaItem.AdsConfiguration.Builder(Uri.parse(it)).build()) }
             }
             .build()
         if (resumePositionMs != null) {
@@ -214,10 +256,14 @@ class ExoPlaybackEngine @Inject constructor(
     override fun release() {
         scope.cancel()
         releasePlayer()
+        // After the player: setPlayer(null) + release() frees the IMA SDK and its ad display container.
+        ads.release()
     }
 
     private fun releasePlayer() {
         _player.value?.let {
+            // Detach IMA first: it must not keep a released player (and setPlayer only allows one).
+            ads.setPlayer(null)
             it.removeAnalyticsListener(tracker)
             it.release()
         }
@@ -225,7 +271,6 @@ class ExoPlaybackEngine @Inject constructor(
     }
 
     private fun buildPlayer(config: PlayerConfig): ExoPlayer {
-        // Topic: Startup & buffer tuning
         // Topic: Startup & buffer tuning. LoadControl is fixed at build time, so new buffer settings
         // mean a new player (start() keeps the VOD position).
         val buffer = config.effectiveBuffer
@@ -255,6 +300,11 @@ class ExoPlaybackEngine @Inject constructor(
         // per MediaItem (from its MIME type, else the URI extension); all of them load through our factory.
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
             .setDataSourceFactory(dataSourceFactory)
+            // Client-side ads: MediaItems with an AdsConfiguration get an AdsMediaSource that asks
+            // the ImaAdsLoader for ads and draws ad UI in the PlayerView (AdViewProvider).
+            // Ad MEDIA (the MP4s from the VAST) loads through the same data source; the VAST/VMAP
+            // requests themselves are made by the IMA SDK.
+            .setLocalAdInsertionComponents({ ads.adsLoader }, ads.adViewProvider)
 
         val player = ExoPlayer.Builder(context)
             .setLoadControl(loadControl)

@@ -1,5 +1,8 @@
 package com.example.livex.qoe
 
+import com.example.livex.player.ads.AdBreakKind
+import com.example.livex.player.ads.AdEventLog
+import com.example.livex.player.ads.AdState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -128,6 +131,24 @@ class StatsStateTest {
     }
 
     @Test
+    fun `ad row shows the ad being played, a dash during content`() {
+        val ad = AdState(isPlayingAd = true, breakKind = AdBreakKind.POST_ROLL, adIndexInBreak = 0, adsInBreak = 1)
+
+        assertEquals("post-roll 1/1", rowValue(StatsState(ad = ad), StatsState.AD))
+        assertEquals("post-roll 1/1 · 8 s", rowValue(StatsState(ad = ad.copy(remainingMs = 7_200)), StatsState.AD))
+        assertEquals("—", rowValue(StatsState(), StatsState.AD))
+    }
+
+    @Test
+    fun `ad events are passed through for the overlay`() {
+        val events = listOf(AdEventLog.Entry("STARTED", isError = false))
+
+        val stats = StatsState.from(metrics, PlayerSample(0, null, 1f), adEvents = events)
+
+        assertEquals(events, stats.adEvents)
+    }
+
+    @Test
     fun `unknown values show a dash`() {
         val stats = StatsState()
 
@@ -156,6 +177,7 @@ class StatsStateTest {
                 StatsState.STALLS,
                 StatsState.REBUFFER_RATIO,
                 StatsState.SEEK_BUFFERING,
+                StatsState.AD,
             ),
             StatsState().rows().map { it.label },
         )

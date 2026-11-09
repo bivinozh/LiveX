@@ -2,7 +2,9 @@ package com.example.livex.player
 
 import androidx.media3.common.Player
 import com.example.livex.data.Stream
+import androidx.media3.ui.PlayerView
 import com.example.livex.network.ThrottleMode
+import com.example.livex.player.ads.AdState
 import com.example.livex.player.live.LiveWindow
 import com.example.livex.qoe.QoeMetrics
 import com.example.livex.qoe.StatsState
@@ -22,7 +24,16 @@ interface PlaybackEngine {
     /** Stats overlay snapshot, refreshed every 500 ms (events + polled player values). */
     val stats: StateFlow<StatsState>
 
-    /** Current playback position of the current item, or 0 if nothing is loaded. */
+    /** Ad currently playing (client-side ads), polled every 500 ms. */
+    val ad: StateFlow<AdState>
+
+    /**
+     * The on-screen PlayerView, used by IMA as AdViewProvider (ad UI + viewability).
+     * Set when the view is created, null when it's released so the Activity isn't leaked.
+     */
+    fun setAdView(view: PlayerView?)
+
+    /** CONTENT position of the current item (not the ad's), or 0 if nothing is loaded. */
     val currentPositionMs: Long
 
     /**

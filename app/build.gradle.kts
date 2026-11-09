@@ -38,6 +38,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        // Required by the IMA SDK (and media3-exoplayer-ima): backports java.time & co. into the APK.
+        isCoreLibraryDesugaringEnabled = true
     }
     buildFeatures {
         compose = true
@@ -81,6 +83,9 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer.dash)
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.datasource.okhttp)
+    // Client-side ad insertion: ImaAdsLoader (pulls in the Google IMA SDK)
+    implementation(libs.androidx.media3.exoplayer.ima)
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(libs.okhttp)
 
     // Navigation (type-safe routes use kotlinx.serialization)

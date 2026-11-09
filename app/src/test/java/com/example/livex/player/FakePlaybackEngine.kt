@@ -1,8 +1,10 @@
 package com.example.livex.player
 
 import androidx.media3.common.Player
+import androidx.media3.ui.PlayerView
 import com.example.livex.data.Stream
 import com.example.livex.network.ThrottleMode
+import com.example.livex.player.ads.AdState
 import com.example.livex.player.live.LiveWindow
 import com.example.livex.qoe.QoeMetrics
 import com.example.livex.qoe.StatsState
@@ -16,6 +18,12 @@ class FakePlaybackEngine : PlaybackEngine {
     override val stats = MutableStateFlow(StatsState())
     override var currentPositionMs: Long = 0
     override val live = MutableStateFlow<LiveWindow?>(null)
+    override val ad = MutableStateFlow(AdState())
+    val adViews = mutableListOf<PlayerView?>()
+
+    override fun setAdView(view: PlayerView?) {
+        adViews += view
+    }
     var goLiveCount = 0
         private set
 
