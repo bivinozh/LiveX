@@ -75,6 +75,14 @@ class QoeCalculatorTest {
     }
 
     @Test
+    fun `load errors are counted`() {
+        calculator.onLoadError()
+        calculator.onLoadError()
+
+        assertEquals(2, calculator.metrics.loadErrorCount)
+    }
+
+    @Test
     fun `reset starts a fresh measurement`() {
         calculator.onFirstFrameRendered(nowMs = 1_850)
         calculator.onDroppedFrames(5)

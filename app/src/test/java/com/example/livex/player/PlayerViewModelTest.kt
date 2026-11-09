@@ -6,6 +6,7 @@ import com.example.livex.data.SampleStreams
 import com.example.livex.data.Topics
 import com.example.livex.navigation.PlayerRoute
 import com.example.livex.qoe.QoeMetrics
+import com.example.livex.qoe.StatsState
 import com.example.livex.testutil.MainDispatcherRule
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -201,6 +202,24 @@ class PlayerViewModelTest {
 
             assertEquals(PlayerEffect.NavigateToManifest(SampleStreams.bigBuckBunny.id), awaitItem())
         }
+    }
+
+    @Test
+    fun `stats overlay is visible by default and toggles`() {
+        assertTrue(viewModel.state.value.isStatsVisible)
+
+        viewModel.onIntent(PlayerIntent.ToggleStats)
+        assertFalse(viewModel.state.value.isStatsVisible)
+
+        viewModel.onIntent(PlayerIntent.ToggleStats)
+        assertTrue(viewModel.state.value.isStatsVisible)
+    }
+
+    @Test
+    fun `stats come straight from the engine`() {
+        engine.stats.value = StatsState(playerState = "Ready", droppedFrames = 4)
+
+        assertEquals(StatsState(playerState = "Ready", droppedFrames = 4), viewModel.stats.value)
     }
 
     @Test

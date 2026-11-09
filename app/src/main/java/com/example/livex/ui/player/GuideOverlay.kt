@@ -113,7 +113,12 @@ private fun GuidePanel(state: PlayerState, onIntent: (PlayerIntent) -> Unit, mod
 private fun VideoInfo(state: PlayerState, onIntent: (PlayerIntent) -> Unit) {
     Text(state.stream.formatLabel, style = MaterialTheme.typography.labelMedium, color = Muted)
     Text(state.stream.title, style = MaterialTheme.typography.titleMedium, color = Color.White)
-    Button(onClick = { onIntent(PlayerIntent.OpenManifest) }) { Text("View manifest") }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = { onIntent(PlayerIntent.OpenManifest) }) { Text("View manifest") }
+        Button(onClick = { onIntent(PlayerIntent.ToggleStats) }) {
+            Text(if (state.isStatsVisible) "Stats: ON" else "Stats: OFF")
+        }
+    }
     Spacer(Modifier.height(4.dp))
 }
 

@@ -3,6 +3,7 @@ package com.example.livex.player
 import androidx.media3.common.Player
 import com.example.livex.data.Stream
 import com.example.livex.qoe.QoeMetrics
+import com.example.livex.qoe.StatsState
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -15,6 +16,9 @@ interface PlaybackEngine {
 
     /** Live QoE numbers for the current player instance. */
     val metrics: StateFlow<QoeMetrics>
+
+    /** Stats overlay snapshot, refreshed every 500 ms (events + polled player values). */
+    val stats: StateFlow<StatsState>
 
     /** Current playback position of the current item, or 0 if nothing is loaded. */
     val currentPositionMs: Long

@@ -69,6 +69,10 @@ class QoeCalculator {
         )
     }
 
+    fun onLoadError() {
+        metrics = metrics.copy(loadErrorCount = metrics.loadErrorCount + 1)
+    }
+
     fun onBandwidthEstimate(bitrateBps: Long) {
         metrics = metrics.copy(bandwidthEstimateBps = bitrateBps)
     }

@@ -10,6 +10,7 @@ import androidx.media3.exoplayer.source.MediaLoadData
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.io.IOException
 
 /** Bridges ExoPlayer analytics events into [QoeCalculator] and publishes the result. */
 @OptIn(UnstableApi::class)
@@ -45,6 +46,18 @@ class QoeTracker : AnalyticsListener {
         loadEventInfo: LoadEventInfo,
         mediaLoadData: MediaLoadData,
     ) = update { onLoadCompleted(loadEventInfo.bytesLoaded, loadEventInfo.loadDurationMs) }
+
+    /**
+     * A segment/manifest request failed. Not fatal by itself: the LoadErrorHandlingPolicy retries
+     * (with backoff), and only exhausted retries become onPlayerError.
+     */
+    override fun onLoadError(
+        eventTime: AnalyticsListener.EventTime,
+        loadEventInfo: LoadEventInfo,
+        mediaLoadData: MediaLoadData,
+        error: IOException,
+        wasCanceled: Boolean,
+    ) = update { onLoadError() }
 
     override fun onBandwidthEstimate(
         eventTime: AnalyticsListener.EventTime,

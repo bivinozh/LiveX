@@ -3,6 +3,7 @@ package com.example.livex.player
 import android.content.Context
 import android.os.SystemClock
 import androidx.annotation.OptIn
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -16,6 +17,8 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.example.livex.data.Stream
 import com.example.livex.qoe.QoeMetrics
 import com.example.livex.qoe.QoeTracker
+import com.example.livex.qoe.PlayerSample
+import com.example.livex.qoe.StatsState
 import com.example.livex.di.UserAgent
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -31,6 +34,9 @@ import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
+
+/** How often the stats overlay (and buffered duration) is refreshed. */
+private val STATS_INTERVAL = 500.milliseconds
 
 /** ExoPlayer-backed [PlaybackEngine]; one instance per PlayerViewModel (ViewModel-scoped in Hilt). */
 @OptIn(UnstableApi::class)
@@ -49,19 +55,36 @@ class ExoPlaybackEngine @Inject constructor(
     private val _player = MutableStateFlow<ExoPlayer?>(null)
     override val player: StateFlow<Player?> = _player.asStateFlow()
     override val metrics: StateFlow<QoeMetrics> = tracker.metrics
+    private val _stats = MutableStateFlow(StatsState())
+    override val stats: StateFlow<StatsState> = _stats.asStateFlow()
     override val currentPositionMs: Long
         get() = _player.value?.currentPosition ?: 0L
 
     init {
-        // Buffered duration isn't an event, so sample it.
+        // Buffer, live offset and speed change continuously without callbacks, so sample them.
+        // Runs on the main thread: Player getters must be called on the player's application looper.
         scope.launch {
             while (isActive) {
                 val current = _player.value
-                if (current != null) tracker.onBufferedDuration(current.totalBufferedDuration)
-                delay(500.milliseconds)
+                if (current != null) {
+                    val sample = current.sample()
+                    tracker.onBufferedDuration(sample.bufferedDurationMs)
+                    _stats.value = StatsState.from(tracker.metrics.value, sample)
+                } else {
+                    _stats.value = StatsState()
+                }
+                delay(STATS_INTERVAL)
             }
         }
     }
+
+    private fun Player.sample() = PlayerSample(
+        bufferedDurationMs = totalBufferedDuration,
+        // currentLiveOffset needs a wall-clock-aware live window (HLS EXT-X-PROGRAM-DATE-TIME,
+        // DASH availabilityStartTime); otherwise it's TIME_UNSET.
+        liveOffsetMs = currentLiveOffset.takeIf { isCurrentMediaItemLive && it != C.TIME_UNSET },
+        playbackSpeed = playbackParameters.speed,
+    )
 
     override fun start(stream: Stream, config: PlayerConfig, startPositionMs: Long?) {
         // An explicit position wins (restore after process death). Otherwise resume only when
