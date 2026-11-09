@@ -218,8 +218,8 @@ private fun ManifestContentPreview() {
     LiveXTheme {
         ManifestContent(
             state = ManifestState(
-                stream = SampleStreams.akamaiLive,
-                currentUrl = SampleStreams.akamaiLive.url,
+                stream = SampleStreams.liveHls,
+                currentUrl = SampleStreams.liveHls.url,
                 text = text,
                 highlights = ManifestAnalyzer.highlights(text),
                 summary = ManifestAnalyzer.summarize(text),

@@ -124,7 +124,7 @@ class PlayerViewModelTest {
     fun `live stream is not restored to an old position`() {
         create(
             mapOf(
-                PlayerViewModel.KEY_STREAM_ID to SampleStreams.akamaiLive.id,
+                PlayerViewModel.KEY_STREAM_ID to SampleStreams.liveHls.id,
                 PlayerViewModel.KEY_POSITION_MS to 42_000L,
             ),
         )

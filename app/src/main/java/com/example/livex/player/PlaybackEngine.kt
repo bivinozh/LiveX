@@ -32,6 +32,15 @@ interface PlaybackEngine {
     /** Resumes playback only if it was playing when [pause] was called. */
     fun resume()
 
+    /** After a playback error: prepare() again, continuing from the current position. */
+    fun retry()
+
+    /**
+     * After ERROR_CODE_BEHIND_LIVE_WINDOW: jump to the live edge (seekToDefaultPosition) and
+     * prepare() again. The segments at the old position have left the server's live window.
+     */
+    fun rejoinLiveEdge()
+
     /** Frees the player completely; the engine can't be used afterwards. */
     fun release()
 }

@@ -17,6 +17,8 @@ data class PlayerState(
     val config: PlayerConfig = PlayerConfig(),
     val metrics: QoeMetrics = QoeMetrics(),
     val isGuideVisible: Boolean = true,
+    /** Player.Listener events mapped for the UI: spinner on Buffering, error card on Error. */
+    val playback: PlayerUiState = PlayerUiState.Idle,
 ) : UiState {
     val topic: Topic get() = topics[topicIndex]
     val isOptimizationEnabled: Boolean
@@ -29,6 +31,9 @@ sealed interface PlayerIntent : UiIntent {
     data object ToggleOptimization : PlayerIntent
     data object ToggleGuide : PlayerIntent
     data object OpenManifest : PlayerIntent
+
+    /** Retry button on the error card. */
+    data object Retry : PlayerIntent
 
     /** App came to the foreground (Lifecycle ON_START). */
     data object LifecycleStart : PlayerIntent

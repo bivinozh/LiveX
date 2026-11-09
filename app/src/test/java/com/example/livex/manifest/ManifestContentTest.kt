@@ -59,7 +59,7 @@ class ManifestContentTest {
 
     @Test
     fun liveStream_refreshSendsRefresh() {
-        setContent(loadedState(SampleStreams.akamaiLive))
+        setContent(loadedState(SampleStreams.liveHls))
 
         composeRule.onNodeWithText("Refresh").performDpadClick()
 

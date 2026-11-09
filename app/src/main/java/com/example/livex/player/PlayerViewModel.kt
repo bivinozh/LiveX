@@ -2,6 +2,8 @@ package com.example.livex.player
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import androidx.annotation.VisibleForTesting
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import com.example.livex.core.mvi.MviViewModel
 import com.example.livex.data.SampleStreams
@@ -28,9 +30,49 @@ class PlayerViewModel @Inject constructor(
     /** Separate from [state]: a Player is a live object, not immutable UI data. */
     val player: StateFlow<Player?> = engine.player
 
+    /**
+     * Translates player callbacks into [PlayerState.playback]. Callbacks arrive on the main thread
+     * (the player's application looper), so updating state here is safe.
+     */
+    @VisibleForTesting
+    internal val playerListener = object : Player.Listener {
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            // After an error the player also reports STATE_IDLE; keep the error card visible.
+            if (playbackState == Player.STATE_IDLE && currentState.playback is PlayerUiState.Error) return
+            setState { copy(playback = playbackState.toUiState()) }
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
+                // Paused or stalled too long on a live stream: our position slid out of the DVR window.
+                // Not the viewer's problem, so recover silently by jumping to the live edge.
+                engine.rejoinLiveEdge()
+                setState { copy(playback = PlayerUiState.Buffering) }
+                return
+            }
+            setState {
+                copy(playback = PlayerUiState.Error(PlaybackErrors.message(error), error.errorCodeName))
+            }
+        }
+    }
+
+    /** The player instance [playerListener] is registered on. */
+    private var listenedPlayer: Player? = null
+
     init {
         engine.metrics
             .onEach { metrics -> setState { copy(metrics = metrics) } }
+            .launchIn(viewModelScope)
+
+        // The engine builds a NEW player on every optimization switch: move the listener along.
+        engine.player
+            .onEach { newPlayer ->
+                listenedPlayer?.removeListener(playerListener)
+                newPlayer?.addListener(playerListener)
+                listenedPlayer = newPlayer
+                // A fresh player starts clean (any old error belonged to the previous instance).
+                setState { copy(playback = newPlayer?.playbackState?.toUiState() ?: PlayerUiState.Idle) }
+            }
             .launchIn(viewModelScope)
 
         restoreState()
@@ -50,6 +92,11 @@ class PlayerViewModel @Inject constructor(
             PlayerIntent.ToggleGuide -> setState { copy(isGuideVisible = !isGuideVisible) }
             PlayerIntent.ToggleOptimization -> toggleOptimization()
             PlayerIntent.OpenManifest -> sendEffect(PlayerEffect.NavigateToManifest(currentState.stream.id))
+            PlayerIntent.Retry -> {
+                engine.retry()
+                // Hide the error card right away; player callbacks take over from here.
+                setState { copy(playback = PlayerUiState.Buffering) }
+            }
             PlayerIntent.LifecycleStart -> engine.resume()
             PlayerIntent.LifecycleStop -> {
                 engine.pause()
@@ -94,8 +141,17 @@ class PlayerViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        listenedPlayer?.removeListener(playerListener)
+        listenedPlayer = null
         // The screen is gone for good (e.g. Back to the list): free decoders, buffers and network.
         engine.release()
+    }
+
+    private fun Int.toUiState(): PlayerUiState = when (this) {
+        Player.STATE_BUFFERING -> PlayerUiState.Buffering
+        Player.STATE_READY -> PlayerUiState.Ready
+        Player.STATE_ENDED -> PlayerUiState.Ended
+        else -> PlayerUiState.Idle
     }
 
     companion object {

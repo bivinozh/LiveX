@@ -9,10 +9,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -29,6 +31,7 @@ import com.example.livex.core.mvi.CollectEffects
 import com.example.livex.data.SampleStreams
 import com.example.livex.data.Stream
 import com.example.livex.ui.theme.LiveXTheme
+import kotlinx.coroutines.flow.first
 
 /** Stateful entry point: wires the ViewModel to the stateless [HomeContent]. */
 @Composable
@@ -67,18 +70,37 @@ fun HomeContent(
                 Text(state.error)
                 Button(onClick = { onIntent(HomeIntent.Retry) }) { Text("Retry") }
             }
-            else -> StreamList(state.streams, onIntent)
+            else -> StreamList(state.streams, state.selectedStreamId, onIntent)
         }
     }
 }
 
 @Composable
-private fun StreamList(streams: List<Stream>, onIntent: (HomeIntent) -> Unit) {
-    val firstItemFocus = remember { FocusRequester() }
+private fun StreamList(
+    streams: List<Stream>,
+    selectedStreamId: String?,
+    onIntent: (HomeIntent) -> Unit,
+) {
+    // Focus the stream the user came back from; first item on first launch (or if it was removed).
+    val focusIndex = streams.indexOfFirst { it.id == selectedStreamId }.coerceAtLeast(0)
+    val itemFocus = remember { FocusRequester() }
+    val listState = rememberLazyListState()
+
     // TV has no touch: something must hold focus so the D-pad works immediately.
-    LaunchedEffect(streams) { if (streams.isNotEmpty()) firstItemFocus.requestFocus() }
+    LaunchedEffect(streams, focusIndex) {
+        if (streams.isEmpty()) return@LaunchedEffect
+        // +1 for the header item. A LazyColumn only composes visible items, so bring the target
+        // on screen before requesting focus (requestFocus on an uncomposed item would throw).
+        val listIndex = focusIndex + 1
+        snapshotFlow { listState.layoutInfo.totalItemsCount }.first { it > 0 } // wait for first layout
+        if (listState.layoutInfo.visibleItemsInfo.none { it.index == listIndex }) {
+            listState.scrollToItem(listIndex)
+        }
+        itemFocus.requestFocus()
+    }
 
     LazyColumn(
+        state = listState,
         contentPadding = PaddingValues(horizontal = 48.dp, vertical = 32.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -93,7 +115,7 @@ private fun StreamList(streams: List<Stream>, onIntent: (HomeIntent) -> Unit) {
             StreamItem(
                 stream = stream,
                 onClick = { onIntent(HomeIntent.StreamClicked(stream.id)) },
-                modifier = if (index == 0) Modifier.focusRequester(firstItemFocus) else Modifier,
+                modifier = if (index == focusIndex) Modifier.focusRequester(itemFocus) else Modifier,
             )
         }
     }

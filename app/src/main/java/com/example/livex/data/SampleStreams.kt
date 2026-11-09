@@ -35,29 +35,37 @@ object SampleStreams {
         isLive = false,
     )
 
-    /** DASH VOD. Tears of Steel, clear (no DRM). */
+    /** DASH VOD. Tears of Steel, clear (no DRM). Same film as [tearsOfSteelHls]: compare HLS vs DASH. */
     val tearsOfSteelDash = Stream(
         id = "tos-dash",
-        title = "Tears of Steel",
+        title = "Tears of Steel (DASH)",
         url = "https://storage.googleapis.com/wvmedia/clear/h264/tears/tears.mpd",
         mimeType = MimeTypes.APPLICATION_MPD,
         isLive = false,
     )
 
-    /** HLS VOD. Apple's reference stream: many variants, alternate audio and subtitles. */
-    val bipbopAdvanced = Stream(
-        id = "bipbop-hls",
-        title = "Apple bipbop (advanced)",
-        url = "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8",
+    /**
+     * HLS VOD. Tears of Steel with a subtitle rendition (EXT-X-MEDIA TYPE=SUBTITLES), hosted on the
+     * same Mux CDN as [bigBuckBunny]. Replaces Apple's bipbop stream, whose CDN certificate is
+     * rejected by the AOSP TV emulator ("Trust anchor for certification path not found").
+     */
+    val tearsOfSteelHls = Stream(
+        id = "tos-hls",
+        title = "Tears of Steel (HLS + subtitles)",
+        url = "https://test-streams.mux.dev/tos_ismc/main.m3u8",
         mimeType = MimeTypes.APPLICATION_M3U8,
         isLive = false,
     )
 
-    /** Live HLS. Akamai's 24/7 test stream with a sliding live window. */
-    val akamaiLive = Stream(
-        id = "akamai-live-hls",
-        title = "Akamai live test",
-        url = "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8",
+    /**
+     * Live HLS. Unified Streaming's 24/7 demo: multi-bitrate master, 2 s segments, sliding window
+     * with EXT-X-PROGRAM-DATE-TIME. Replaces Akamai's test stream, whose master playlist now points
+     * at a variant that returns HTTP 404.
+     */
+    val liveHls = Stream(
+        id = "unified-live-hls",
+        title = "Unified Streaming live",
+        url = "https://demo.unified-streaming.com/k8s/live/stable/live.isml/.m3u8",
         mimeType = MimeTypes.APPLICATION_M3U8,
         isLive = true,
     )
@@ -71,7 +79,7 @@ object SampleStreams {
         isLive = true,
     )
 
-    val all: List<Stream> = listOf(bigBuckBunny, tearsOfSteelDash, bipbopAdvanced, akamaiLive, dashIfLivesim)
+    val all: List<Stream> = listOf(bigBuckBunny, tearsOfSteelHls, tearsOfSteelDash, liveHls, dashIfLivesim)
 
     fun byId(id: String?): Stream? = all.firstOrNull { it.id == id }
 }

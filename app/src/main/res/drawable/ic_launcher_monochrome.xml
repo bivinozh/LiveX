@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Themed-icon layer (Material You). The launcher tints it, so only alpha matters:
+  the play triangle is cut out of the circle with evenOdd.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M30,54 A24,24 0 1 1 78,54 A24,24 0 1 1 30,54 Z M49,44 L49,64 L64,54 Z" />
+</vector>
