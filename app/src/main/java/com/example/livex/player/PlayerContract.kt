@@ -7,6 +7,7 @@ import com.example.livex.data.SampleStreams
 import com.example.livex.data.Stream
 import com.example.livex.data.Topic
 import com.example.livex.data.Topics
+import com.example.livex.network.ThrottleMode
 import com.example.livex.qoe.QoeMetrics
 
 data class PlayerState(
@@ -19,6 +20,8 @@ data class PlayerState(
     val isGuideVisible: Boolean = true,
     /** Stats overlay toggle. The stats themselves stream separately (PlayerViewModel.stats). */
     val isStatsVisible: Boolean = true,
+    /** Network throttle simulator mode (applied at runtime, no player rebuild). */
+    val throttleMode: ThrottleMode = ThrottleMode.UNLIMITED,
     /** Player.Listener events mapped for the UI: spinner on Buffering, error card on Error. */
     val playback: PlayerUiState = PlayerUiState.Idle,
 ) : UiState {
@@ -40,6 +43,9 @@ sealed interface PlayerIntent : UiIntent {
 
     /** Seek buttons in the guide: relative jump, negative = back. */
     data class SeekBy(val offsetMs: Long) : PlayerIntent
+
+    /** Network dropdown: simulate a slower or unstable connection. */
+    data class SetThrottleMode(val mode: ThrottleMode) : PlayerIntent
 
     /** App came to the foreground (Lifecycle ON_START). */
     data object LifecycleStart : PlayerIntent

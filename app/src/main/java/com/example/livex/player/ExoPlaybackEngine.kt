@@ -1,6 +1,7 @@
 package com.example.livex.player
 
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.os.SystemClock
 import androidx.annotation.OptIn
 import androidx.media3.common.C
@@ -14,9 +15,13 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.util.EventLogger
 import com.example.livex.data.Stream
 import com.example.livex.qoe.QoeMetrics
 import com.example.livex.qoe.QoeTracker
+import com.example.livex.network.NetworkThrottle
+import com.example.livex.network.ThrottleMode
+import com.example.livex.network.ThrottlingDataSource
 import com.example.livex.qoe.BufferHistory
 import com.example.livex.qoe.BufferPoint
 import com.example.livex.qoe.PlayerSample
@@ -59,6 +64,11 @@ class ExoPlaybackEngine @Inject constructor(
     override val metrics: StateFlow<QoeMetrics> = tracker.metrics
     private val _stats = MutableStateFlow(StatsState())
     private val bufferHistory = BufferHistory()
+
+    /** One simulated link for the engine's lifetime: survives player rebuilds, switchable at runtime. */
+    private val throttle = NetworkThrottle()
+
+    private val isDebuggable = context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
     override val stats: StateFlow<StatsState> = _stats.asStateFlow()
     override val currentPositionMs: Long
         get() = _player.value?.currentPosition ?: 0L
@@ -103,6 +113,9 @@ class ExoPlaybackEngine @Inject constructor(
 
         val newPlayer = buildPlayer(config)
         newPlayer.addAnalyticsListener(tracker)
+        // Debug builds: log every load, format switch and state change to logcat (tag "EventLogger").
+        // The quickest way to see what ABR downloads (downstreamFormat) vs. what plays (videoInputFormat).
+        if (isDebuggable) newPlayer.addAnalyticsListener(EventLogger())
         // The play request: startup (VST) is measured from here to the first rendered frame.
         tracker.reset(nowMs = SystemClock.elapsedRealtime())
         bufferHistory.clear()
@@ -133,6 +146,10 @@ class ExoPlaybackEngine @Inject constructor(
     override fun resume() {
         if (resumeOnStart) _player.value?.play()
         resumeOnStart = false
+    }
+
+    override fun setThrottleMode(mode: ThrottleMode) {
+        throttle.mode = mode
     }
 
     override fun seekBy(offsetMs: Long) {
@@ -186,8 +203,11 @@ class ExoPlaybackEngine @Inject constructor(
             } else {
                 DefaultHttpDataSource.Factory().setUserAgent(userAgent)
             }
+        // Network throttle simulator: sits between the player and the HTTP stack. It reads the
+        // current mode on every read, so switching modes needs no player rebuild.
+        val throttledFactory = ThrottlingDataSource.Factory(httpFactory, throttle)
         // DefaultDataSource adds support for non-HTTP URIs (file://, asset://, content://) on top.
-        val dataSourceFactory = DefaultDataSource.Factory(context, httpFactory)
+        val dataSourceFactory = DefaultDataSource.Factory(context, throttledFactory)
 
         // DefaultMediaSourceFactory picks HlsMediaSource / DashMediaSource / ProgressiveMediaSource
         // per MediaItem (from its MIME type, else the URI extension); all of them load through our factory.
