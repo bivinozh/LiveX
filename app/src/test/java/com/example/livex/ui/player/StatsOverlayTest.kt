@@ -4,6 +4,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.example.livex.player.abr.QualitySwitch
 import com.example.livex.qoe.BufferPoint
 import com.example.livex.qoe.StatsState
 import com.example.livex.ui.theme.LiveXTheme
@@ -35,6 +36,18 @@ class StatsOverlayTest {
         composeRule.onNodeWithText("1920×1080").assertExists()
         composeRule.onNodeWithText("8.0 s").assertExists()
         composeRule.onNodeWithText("7").assertExists()
+    }
+
+    @Test
+    fun showsRecentQualitySwitches() {
+        val switch = QualitySwitch(
+            atMs = 0, fromHeight = 480, fromBitrate = 836_000, toHeight = 720, toBitrate = 2_149_280,
+            reason = "ADAPTIVE", bandwidthBps = 8_400_000, bufferedMs = 12_300,
+        )
+        composeRule.setContent { LiveXTheme { StatsOverlay(StatsState(recentSwitches = listOf(switch))) } }
+
+        composeRule.onNodeWithText("Quality switches").assertExists()
+        composeRule.onNodeWithText(switch.compact()).assertExists()
     }
 
     @Test

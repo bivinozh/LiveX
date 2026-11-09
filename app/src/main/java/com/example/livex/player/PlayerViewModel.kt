@@ -8,6 +8,8 @@ import androidx.media3.common.Player
 import com.example.livex.core.mvi.MviViewModel
 import com.example.livex.data.SampleStreams
 import com.example.livex.qoe.StatsState
+import com.example.livex.settings.AbrSettings
+import com.example.livex.settings.AbrSettingsRepository
 import com.example.livex.settings.BufferSettings
 import com.example.livex.settings.BufferSettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -28,6 +30,7 @@ import javax.inject.Inject
 class PlayerViewModel @Inject constructor(
     private val engine: PlaybackEngine,
     bufferSettingsRepository: BufferSettingsRepository,
+    abrSettingsRepository: AbrSettingsRepository,
     private val savedState: SavedStateHandle,
 ) : MviViewModel<PlayerState, PlayerIntent, PlayerEffect>(PlayerState()) {
 
@@ -102,6 +105,24 @@ class PlayerViewModel @Inject constructor(
         bufferSettingsRepository.settings
             .onEach(::onBufferSettings)
             .launchIn(viewModelScope)
+
+        abrSettingsRepository.settings
+            .onEach(::onAbrSettings)
+            .launchIn(viewModelScope)
+
+        engine.quality
+            .onEach { quality -> setState { copy(quality = quality) } }
+            .launchIn(viewModelScope)
+    }
+
+    /**
+     * ABR settings are always applied (no on/off switch), so any difference from what the player was
+     * built with needs a rebuild. With Media3 defaults saved (the usual case) nothing happens.
+     */
+    private fun onAbrSettings(settings: AbrSettings) {
+        if (settings == currentState.config.abr) return
+        setState { copy(config = config.copy(abr = settings)) }
+        rebuild()
     }
 
     /**
@@ -126,7 +147,7 @@ class PlayerViewModel @Inject constructor(
         } else {
             // Same stream: the engine resumes a VOD at its current position (live rejoins the edge).
             engine.start(currentState.stream, currentState.config)
-            sendEffect(PlayerEffect.ShowMessage("Player restarted with your buffer settings"))
+            sendEffect(PlayerEffect.ShowMessage("Player restarted with your new settings"))
         }
     }
 
@@ -143,6 +164,9 @@ class PlayerViewModel @Inject constructor(
             PlayerIntent.ToggleOptimization -> toggleOptimization()
             PlayerIntent.OpenManifest -> sendEffect(PlayerEffect.NavigateToManifest(currentState.stream.id))
             PlayerIntent.OpenBufferSettings -> sendEffect(PlayerEffect.NavigateToBufferSettings)
+            PlayerIntent.OpenAbrSettings -> sendEffect(PlayerEffect.NavigateToAbrSettings)
+            // No rebuild: a TrackSelectionOverride is applied to the running player.
+            is PlayerIntent.SelectQuality -> engine.selectQuality(intent.height)
             is PlayerIntent.SeekBy -> engine.seekBy(intent.offsetMs)
             is PlayerIntent.SetThrottleMode -> {
                 // Unlike the optimization toggles, no engine.start(): the data source reads the mode

@@ -59,6 +59,19 @@ fun StatsOverlay(stats: StatsState, modifier: Modifier = Modifier) {
         }
         Spacer(Modifier.height(6.dp))
         BufferChart(stats.bufferHistory)
+        if (stats.recentSwitches.isNotEmpty()) {
+            Spacer(Modifier.height(6.dp))
+            Text("Quality switches", style = MaterialTheme.typography.labelMedium, color = TitleColor)
+            // Newest last; the full lines (with bitrates) are in Logcat, tag LiveX-ABR.
+            stats.recentSwitches.takeLast(3).forEach { switch ->
+                Text(
+                    switch.compact(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = Color.White,
+                )
+            }
+        }
     }
 }
 

@@ -6,6 +6,8 @@ import android.os.SystemClock
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.Tracks
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
@@ -15,11 +17,17 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import androidx.media3.exoplayer.util.EventLogger
 import com.example.livex.data.Stream
 import com.example.livex.qoe.QoeMetrics
 import com.example.livex.qoe.QoeTracker
 import com.example.livex.network.NetworkThrottle
+import com.example.livex.player.abr.AbrTracker
+import com.example.livex.player.abr.QualityOptions
+import com.example.livex.player.abr.QualityState
 import com.example.livex.network.ThrottleMode
 import com.example.livex.network.ThrottlingDataSource
 import com.example.livex.qoe.BufferHistory
@@ -65,6 +73,22 @@ class ExoPlaybackEngine @Inject constructor(
     private val _stats = MutableStateFlow(StatsState())
     private val bufferHistory = BufferHistory()
 
+    // Track selection & ABR
+    private var trackSelector: DefaultTrackSelector? = null
+    private val abrTracker = AbrTracker(bufferedMs = { _player.value?.totalBufferedDuration ?: 0L })
+    private val _quality = MutableStateFlow(QualityState())
+    override val quality: StateFlow<QualityState> = _quality.asStateFlow()
+
+    /** Rebuilds the quality list whenever the available tracks change (manifest parsed, period change...). */
+    private val tracksListener = object : Player.Listener {
+        override fun onTracksChanged(tracks: Tracks) {
+            val hadOptions = _quality.value.options.isNotEmpty()
+            _quality.value = _quality.value.copy(options = QualityOptions.from(tracks))
+            // A manual choice survives player rebuilds: re-apply it once the new player knows its tracks.
+            if (!hadOptions && _quality.value.selectedHeight != null) applyQualityOverride()
+        }
+    }
+
     /** One simulated link for the engine's lifetime: survives player rebuilds, switchable at runtime. */
     private val throttle = NetworkThrottle()
 
@@ -85,7 +109,7 @@ class ExoPlaybackEngine @Inject constructor(
                     tracker.onTick(sample.bufferedDurationMs, nowMs)
                     val metrics = tracker.metrics.value
                     bufferHistory.add(BufferPoint(nowMs, sample.bufferedDurationMs, metrics.stalls.isStalled))
-                    _stats.value = StatsState.from(metrics, sample, bufferHistory.points)
+                    _stats.value = StatsState.from(metrics, sample, bufferHistory.points, abrTracker.switches.value)
                 } else {
                     _stats.value = StatsState()
                 }
@@ -113,6 +137,10 @@ class ExoPlaybackEngine @Inject constructor(
 
         val newPlayer = buildPlayer(config)
         newPlayer.addAnalyticsListener(tracker)
+        newPlayer.addAnalyticsListener(abrTracker)
+        newPlayer.addListener(tracksListener)
+        abrTracker.reset()
+        _quality.value = _quality.value.copy(options = emptyList()) // keep the manual choice, if any
         // Debug builds: log every load, format switch and state change to logcat (tag "EventLogger").
         // The quickest way to see what ABR downloads (downstreamFormat) vs. what plays (videoInputFormat).
         if (isDebuggable) newPlayer.addAnalyticsListener(EventLogger())
@@ -148,6 +176,29 @@ class ExoPlaybackEngine @Inject constructor(
         resumeOnStart = false
     }
 
+    /**
+     * Manual quality: pins video to one track with a TrackSelectionOverride. null = Auto (ABR).
+     * Applied through the track selector's parameters, so no rebuild: the player re-selects tracks
+     * and the next segments come in the chosen rendition (already buffered ones still play first).
+     */
+    override fun selectQuality(height: Int?) {
+        _quality.value = _quality.value.copy(selectedHeight = height)
+        applyQualityOverride()
+    }
+
+    private fun applyQualityOverride() {
+        val selector = trackSelector ?: return
+        val player = _player.value ?: return
+        val params = selector.buildUponParameters().clearOverridesOfType(C.TRACK_TYPE_VIDEO)
+        val height = _quality.value.selectedHeight
+        val option = height?.let { h -> _quality.value.options.firstOrNull { it.height == h } }
+        if (option != null) {
+            val group = player.currentTracks.groups[option.groupIndex].mediaTrackGroup
+            params.addOverride(TrackSelectionOverride(group, option.trackIndex))
+        }
+        selector.setParameters(params)
+    }
+
     override fun setThrottleMode(mode: ThrottleMode) {
         throttle.mode = mode
     }
@@ -179,13 +230,15 @@ class ExoPlaybackEngine @Inject constructor(
     private fun releasePlayer() {
         _player.value?.let {
             it.removeAnalyticsListener(tracker)
+            it.removeAnalyticsListener(abrTracker)
+            it.removeListener(tracksListener)
             it.release()
         }
         _player.value = null
+        trackSelector = null
     }
 
     private fun buildPlayer(config: PlayerConfig): ExoPlayer {
-        // Topic: Startup & buffer tuning
         // Topic: Startup & buffer tuning. LoadControl is fixed at build time, so new buffer settings
         // mean a new player (start() keeps the VOD position).
         val buffer = config.effectiveBuffer
@@ -216,17 +269,37 @@ class ExoPlaybackEngine @Inject constructor(
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
             .setDataSourceFactory(dataSourceFactory)
 
-        val player = ExoPlayer.Builder(context)
-            .setLoadControl(loadControl)
-            .setMediaSourceFactory(mediaSourceFactory)
+        // Topic: ABR. AdaptiveTrackSelection decides WHICH rendition to load next; the factory's knobs
+        // set how eagerly it goes up/down. DefaultTrackSelector applies constraints and overrides on top.
+        val abr = config.abr
+        val selector = DefaultTrackSelector(
+            context,
+            AdaptiveTrackSelection.Factory(
+                abr.minDurationForQualityIncreaseMs,
+                abr.maxDurationForQualityDecreaseMs,
+                AdaptiveTrackSelection.DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS,
+                abr.bandwidthFraction,
+            ),
+        )
+        if (config.dataSaverAbr) {
+            selector.setParameters(
+                selector.buildUponParameters()
+                    .setMaxVideoSize(AbrProfile.DATA_SAVER_MAX_WIDTH, AbrProfile.DATA_SAVER_MAX_HEIGHT),
+            )
+        }
+        trackSelector = selector
+
+        // A fresh meter per player so the initial estimate is what decides the first rendition
+        // (the app-wide singleton would carry over what earlier sessions measured).
+        val bandwidthMeter = DefaultBandwidthMeter.Builder(context)
+            .apply { abr.initialBitrateEstimateBps?.let { setInitialBitrateEstimate(it) } }
             .build()
 
-        // Topic: ABR
-        if (config.dataSaverAbr) {
-            player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-                .setMaxVideoSize(AbrProfile.DATA_SAVER_MAX_WIDTH, AbrProfile.DATA_SAVER_MAX_HEIGHT)
-                .build()
-        }
-        return player
+        return ExoPlayer.Builder(context)
+            .setLoadControl(loadControl)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .setTrackSelector(selector)
+            .setBandwidthMeter(bandwidthMeter)
+            .build()
     }
 }
