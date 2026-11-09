@@ -28,6 +28,7 @@ import com.example.livex.player.PlayerViewModel
 fun PlayerScreen(
     onOpenManifest: (streamId: String) -> Unit,
     onOpenBufferSettings: () -> Unit,
+    onOpenAbrSettings: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: PlayerViewModel = hiltViewModel(),
 ) {
@@ -46,6 +47,7 @@ fun PlayerScreen(
             is PlayerEffect.NavigateToManifest -> onOpenManifest(effect.streamId)
             // Same pause/resume as the manifest viewer; saved settings are applied on return.
             PlayerEffect.NavigateToBufferSettings -> onOpenBufferSettings()
+            PlayerEffect.NavigateToAbrSettings -> onOpenAbrSettings()
         }
     }
 

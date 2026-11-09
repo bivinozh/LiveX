@@ -129,6 +129,12 @@ private fun VideoInfo(state: PlayerState, onIntent: (PlayerIntent) -> Unit) {
     // Throttle simulator: watch Est. bandwidth fall, Resolution step down (ABR) and, if the buffer
     // can't keep up, Stalls and red bands in the buffer chart.
     NetworkDropdown(mode = state.throttleMode, onSelect = { onIntent(PlayerIntent.SetThrottleMode(it)) })
+    // Manual quality = TrackSelectionOverride; Auto = AdaptiveTrackSelection decides.
+    QualityDropdown(
+        quality = state.quality,
+        playingHeight = state.metrics.videoHeight,
+        onSelect = { onIntent(PlayerIntent.SelectQuality(it)) },
+    )
     Spacer(Modifier.height(4.dp))
 }
 
@@ -148,8 +154,12 @@ private fun OptimizationSection(optimization: Optimization, enabled: Boolean, on
         color = Muted,
     )
     BodyText("Trade-off: ${optimization.tradeOff}", color = Muted)
-    if (optimization.toggle == OptimizationToggle.BUFFER) {
-        Button(onClick = { onIntent(PlayerIntent.OpenBufferSettings) }) { Text("Edit buffer settings") }
+    when (optimization.toggle) {
+        OptimizationToggle.BUFFER ->
+            Button(onClick = { onIntent(PlayerIntent.OpenBufferSettings) }) { Text("Edit buffer settings") }
+        OptimizationToggle.ABR ->
+            Button(onClick = { onIntent(PlayerIntent.OpenAbrSettings) }) { Text("Edit ABR settings") }
+        OptimizationToggle.NETWORK -> Unit
     }
 }
 
