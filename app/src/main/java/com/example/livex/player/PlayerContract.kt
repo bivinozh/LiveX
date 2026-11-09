@@ -38,6 +38,9 @@ sealed interface PlayerIntent : UiIntent {
     data object ToggleStats : PlayerIntent
     data object OpenManifest : PlayerIntent
 
+    /** "Edit buffer settings" in the buffer topic. */
+    data object OpenBufferSettings : PlayerIntent
+
     /** Retry button on the error card. */
     data object Retry : PlayerIntent
 
@@ -57,4 +60,5 @@ sealed interface PlayerIntent : UiIntent {
 sealed interface PlayerEffect : UiEffect {
     data class ShowMessage(val message: String) : PlayerEffect
     data class NavigateToManifest(val streamId: String) : PlayerEffect
+    data object NavigateToBufferSettings : PlayerEffect
 }

@@ -8,6 +8,8 @@ import androidx.media3.common.Player
 import com.example.livex.core.mvi.MviViewModel
 import com.example.livex.data.SampleStreams
 import com.example.livex.qoe.StatsState
+import com.example.livex.settings.BufferSettings
+import com.example.livex.settings.BufferSettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.launchIn
@@ -25,6 +27,7 @@ import javax.inject.Inject
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     private val engine: PlaybackEngine,
+    bufferSettingsRepository: BufferSettingsRepository,
     private val savedState: SavedStateHandle,
 ) : MviViewModel<PlayerState, PlayerIntent, PlayerEffect>(PlayerState()) {
 
@@ -67,6 +70,14 @@ class PlayerViewModel @Inject constructor(
     /** The player instance [playerListener] is registered on. */
     private var listenedPlayer: Player? = null
 
+    /** Between ON_STOP and ON_START (e.g. the settings screen is open). */
+    private var isStopped = false
+
+    /** Settings changed while stopped: rebuild on return instead of now (a new player starts playing). */
+    private var rebuildPending = false
+
+    private var bufferSettingsLoaded = false
+
     init {
         engine.metrics
             .onEach { metrics -> setState { copy(metrics = metrics) } }
@@ -87,6 +98,36 @@ class PlayerViewModel @Inject constructor(
         val restoredPositionMs = savedState.get<Long>(KEY_POSITION_MS)
             ?.takeUnless { currentState.stream.isLive } // live: always join at the live edge
         engine.start(currentState.stream, currentState.config, restoredPositionMs)
+
+        bufferSettingsRepository.settings
+            .onEach(::onBufferSettings)
+            .launchIn(viewModelScope)
+    }
+
+    /**
+     * First value = loading what's saved: just remember it (rebuild only if it's in use and differs).
+     * Later values = the user saved new settings: switch buffer tuning on and rebuild.
+     */
+    private fun onBufferSettings(settings: BufferSettings) {
+        val isInitialLoad = !bufferSettingsLoaded
+        bufferSettingsLoaded = true
+        if (settings == currentState.config.buffer) return
+
+        val config = currentState.config
+        val newConfig = config.copy(buffer = settings, tunedBuffer = config.tunedBuffer || !isInitialLoad)
+        setState { copy(config = newConfig) }
+        if (newConfig.effectiveBuffer != config.effectiveBuffer) rebuild()
+    }
+
+    /** LoadControl is fixed when the player is built: new buffer settings need a new player. */
+    private fun rebuild() {
+        if (isStopped) {
+            rebuildPending = true
+        } else {
+            // Same stream: the engine resumes a VOD at its current position (live rejoins the edge).
+            engine.start(currentState.stream, currentState.config)
+            sendEffect(PlayerEffect.ShowMessage("Player restarted with your buffer settings"))
+        }
     }
 
     override fun handleIntent(intent: PlayerIntent) {
@@ -101,6 +142,7 @@ class PlayerViewModel @Inject constructor(
             PlayerIntent.ToggleStats -> setState { copy(isStatsVisible = !isStatsVisible) }
             PlayerIntent.ToggleOptimization -> toggleOptimization()
             PlayerIntent.OpenManifest -> sendEffect(PlayerEffect.NavigateToManifest(currentState.stream.id))
+            PlayerIntent.OpenBufferSettings -> sendEffect(PlayerEffect.NavigateToBufferSettings)
             is PlayerIntent.SeekBy -> engine.seekBy(intent.offsetMs)
             is PlayerIntent.SetThrottleMode -> {
                 // Unlike the optimization toggles, no engine.start(): the data source reads the mode
@@ -113,8 +155,17 @@ class PlayerViewModel @Inject constructor(
                 // Hide the error card right away; player callbacks take over from here.
                 setState { copy(playback = PlayerUiState.Buffering) }
             }
-            PlayerIntent.LifecycleStart -> engine.resume()
+            PlayerIntent.LifecycleStart -> {
+                isStopped = false
+                if (rebuildPending) {
+                    rebuildPending = false
+                    rebuild() // the new player starts playing by itself, so no resume()
+                } else {
+                    engine.resume()
+                }
+            }
             PlayerIntent.LifecycleStop -> {
+                isStopped = true
                 engine.pause()
                 saveState()
             }

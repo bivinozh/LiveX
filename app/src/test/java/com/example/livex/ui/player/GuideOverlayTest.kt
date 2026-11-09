@@ -66,6 +66,22 @@ class GuideOverlayTest {
     }
 
     @Test
+    fun bufferTopic_hasEditSettingsButton() {
+        setContent(PlayerState(topicIndex = bufferTopicIndex))
+
+        composeRule.onNodeWithText("Edit buffer settings").performDpadClick()
+
+        assertEquals(listOf<PlayerIntent>(PlayerIntent.OpenBufferSettings), sentIntents)
+    }
+
+    @Test
+    fun otherTopics_haveNoEditSettingsButton() {
+        setContent(PlayerState())
+
+        composeRule.onNodeWithText("Edit buffer settings").assertDoesNotExist()
+    }
+
+    @Test
     fun enabledOptimization_showsOptimizedMode() {
         setContent(PlayerState(topicIndex = bufferTopicIndex, config = PlayerConfig(tunedBuffer = true)))
 

@@ -186,7 +186,9 @@ class ExoPlaybackEngine @Inject constructor(
 
     private fun buildPlayer(config: PlayerConfig): ExoPlayer {
         // Topic: Startup & buffer tuning
-        val buffer = if (config.tunedBuffer) BufferProfile.Tuned else BufferProfile.Default
+        // Topic: Startup & buffer tuning. LoadControl is fixed at build time, so new buffer settings
+        // mean a new player (start() keeps the VOD position).
+        val buffer = config.effectiveBuffer
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 buffer.minBufferMs,

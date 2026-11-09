@@ -7,6 +7,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.livex.feature.home.HomeScreen
 import com.example.livex.manifest.ManifestScreen
+import com.example.livex.settings.BufferSettingsScreen
 import com.example.livex.ui.player.PlayerScreen
 import kotlinx.serialization.Serializable
 
@@ -24,6 +25,10 @@ data class PlayerRoute(val streamId: String)
 @Serializable
 data class ManifestRoute(val streamId: String)
 
+/** Buffer tuning sliders and presets (DataStore). */
+@Serializable
+data object BufferSettingsRoute
+
 @Composable
 fun LiveXNavHost(navController: NavHostController = rememberNavController()) {
     NavHost(navController = navController, startDestination = HomeRoute) {
@@ -33,7 +38,14 @@ fun LiveXNavHost(navController: NavHostController = rememberNavController()) {
         // Each destination gets its own ViewModelStore: leaving the player (Back) clears
         // PlayerViewModel, whose onCleared() releases the ExoPlayer.
         composable<PlayerRoute> {
-            PlayerScreen(onOpenManifest = { streamId -> navController.navigate(ManifestRoute(streamId)) })
+            PlayerScreen(
+                onOpenManifest = { streamId -> navController.navigate(ManifestRoute(streamId)) },
+                onOpenBufferSettings = { navController.navigate(BufferSettingsRoute) },
+            )
+        }
+        composable<BufferSettingsRoute> {
+            // Saved: back to the player, which rebuilds with the new LoadControl on ON_START.
+            BufferSettingsScreen(onSaved = { navController.popBackStack() })
         }
         composable<ManifestRoute> {
             ManifestScreen()
