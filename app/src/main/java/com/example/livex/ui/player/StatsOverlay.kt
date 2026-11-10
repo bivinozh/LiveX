@@ -59,6 +59,19 @@ fun StatsOverlay(stats: StatsState, modifier: Modifier = Modifier) {
         }
         Spacer(Modifier.height(6.dp))
         BufferChart(stats.bufferHistory)
+        if (stats.adEvents.isNotEmpty()) {
+            Spacer(Modifier.height(6.dp))
+            Text("Ad events", style = MaterialTheme.typography.labelMedium, color = TitleColor)
+            // Newest last; every event is also in Logcat (tag LiveX-Ads).
+            stats.adEvents.takeLast(3).forEach { event ->
+                Text(
+                    event.text,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = if (event.isError) Color(0xFFEF9A9A) else Color.White,
+                )
+            }
+        }
     }
 }
 

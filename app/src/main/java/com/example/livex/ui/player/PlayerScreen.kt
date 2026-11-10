@@ -56,12 +56,17 @@ fun PlayerScreen(
                 PlayerView(ctx).apply {
                     // The guide overlay owns D-pad focus; the built-in controller would compete for it.
                     useController = false
+                    // IMA draws ad UI in this view's ad overlay (AdViewProvider).
+                    viewModel.setAdView(this)
                 }
             },
             // Re-attaches whenever the engine rebuilds the player after an optimization switch.
             update = { playerView -> playerView.player = player },
             // Detach so the long-lived player doesn't keep a reference to a destroyed Activity's view.
-            onRelease = { playerView -> playerView.player = null },
+            onRelease = { playerView ->
+                playerView.player = null
+                viewModel.setAdView(null)
+            },
             modifier = Modifier.fillMaxSize(),
         )
 
@@ -85,6 +90,14 @@ fun PlayerScreen(
                 )
             }
         }
+
+        // Top-right of the video area (left of the guide panel), like broadcast TV.
+        AdBadge(
+            ad = state.ad,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 24.dp, end = 24.dp + if (state.isGuideVisible) GuidePanelWidth else 0.dp),
+        )
 
         GuideOverlay(state = state, onIntent = viewModel::onIntent)
 

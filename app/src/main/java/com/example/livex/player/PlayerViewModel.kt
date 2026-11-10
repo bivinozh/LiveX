@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.annotation.VisibleForTesting
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.ui.PlayerView
 import com.example.livex.core.mvi.MviViewModel
 import com.example.livex.data.SampleStreams
 import com.example.livex.player.live.LiveLatency
@@ -107,7 +108,15 @@ class PlayerViewModel @Inject constructor(
         bufferSettingsRepository.settings
             .onEach(::onBufferSettings)
             .launchIn(viewModelScope)
+
+        // Content: changes only at ad boundaries. During an ad: every 500 ms tick (remaining time).
+        engine.ad
+            .onEach { ad -> setState { copy(ad = ad) } }
+            .launchIn(viewModelScope)
     }
+
+    /** The on-screen PlayerView, for IMA's ad UI. The view is passed through, never stored here. */
+    fun setAdView(view: PlayerView?) = engine.setAdView(view)
 
     /**
      * First value = loading what's saved: just remember it (rebuild only if it's in use and differs).
