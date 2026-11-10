@@ -7,6 +7,8 @@ import com.example.livex.data.Topics
 import com.example.livex.navigation.PlayerRoute
 import com.example.livex.player.ads.AdBreakKind
 import com.example.livex.player.ads.AdState
+import com.example.livex.player.ads.SeekOutcome
+import com.example.livex.player.ads.VodProgress
 import com.example.livex.player.live.LiveLatency
 import com.example.livex.player.live.LiveWindow
 import com.example.livex.network.ThrottleMode
@@ -379,6 +381,36 @@ class PlayerViewModelTest {
         advanceUntilIdle()
 
         assertEquals(playing, viewModel.state.value.ad)
+    }
+
+    @Test
+    fun `seeking past an unwatched ad break explains that the ad plays first`() = runTest {
+        engine.nextSeekOutcome = SeekOutcome.SnappedToAd(adTimeMs = 60_000, resumeAtMs = 90_000)
+
+        viewModel.effects.test {
+            viewModel.onIntent(PlayerIntent.SeekBy(60_000))
+
+            assertEquals(PlayerEffect.ShowMessage("Ad break at 1:00 plays first, then 1:30"), awaitItem())
+        }
+    }
+
+    @Test
+    fun `seeking during an ad is refused with a message`() = runTest {
+        engine.nextSeekOutcome = SeekOutcome.BlockedDuringAd
+
+        viewModel.effects.test {
+            viewModel.onIntent(PlayerIntent.SeekBy(10_000))
+
+            assertEquals(PlayerEffect.ShowMessage("Seeking is disabled while an ad plays"), awaitItem())
+        }
+    }
+
+    @Test
+    fun `vod progress comes straight from the engine`() {
+        val progress = VodProgress(positionMs = 1_000, durationMs = 60_000, adBreaks = emptyList())
+        engine.progress.value = progress
+
+        assertEquals(progress, viewModel.progress.value)
     }
 
     @Test

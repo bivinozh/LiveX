@@ -8,6 +8,8 @@ import androidx.media3.common.Player
 import androidx.media3.ui.PlayerView
 import com.example.livex.core.mvi.MviViewModel
 import com.example.livex.data.SampleStreams
+import com.example.livex.player.ads.SeekOutcome
+import com.example.livex.player.ads.VodProgress
 import com.example.livex.player.live.LiveLatency
 import com.example.livex.player.live.LiveWindow
 import com.example.livex.qoe.StatsState
@@ -46,6 +48,9 @@ class PlayerViewModel @Inject constructor(
 
     /** Live (DVR) window for the live control bar; also 500 ms telemetry, so kept out of [state] too. */
     val live: StateFlow<LiveWindow?> = engine.live
+
+    /** VOD progress + ad break markers for the seek bar; 500 ms telemetry like [stats]. */
+    val progress: StateFlow<VodProgress?> = engine.progress
 
     /**
      * Translates player callbacks into [PlayerState.playback]. Callbacks arrive on the main thread
@@ -157,7 +162,15 @@ class PlayerViewModel @Inject constructor(
             PlayerIntent.ToggleOptimization -> toggleOptimization()
             PlayerIntent.OpenManifest -> sendEffect(PlayerEffect.NavigateToManifest(currentState.stream.id))
             PlayerIntent.OpenBufferSettings -> sendEffect(PlayerEffect.NavigateToBufferSettings)
-            is PlayerIntent.SeekBy -> engine.seekBy(intent.offsetMs)
+            is PlayerIntent.SeekBy -> when (val outcome = engine.seekBy(intent.offsetMs)) {
+                is SeekOutcome.SnappedToAd -> sendEffect(
+                    PlayerEffect.ShowMessage(
+                        "Ad break at ${VodProgress.clock(outcome.adTimeMs)} plays first, then ${VodProgress.clock(outcome.resumeAtMs)}",
+                    ),
+                )
+                SeekOutcome.BlockedDuringAd -> sendEffect(PlayerEffect.ShowMessage("Seeking is disabled while an ad plays"))
+                is SeekOutcome.Seeked -> Unit
+            }
             PlayerIntent.GoLive -> engine.goLive()
             is PlayerIntent.SetLiveLatency -> setLiveLatency(intent.latency)
             is PlayerIntent.SetThrottleMode -> {

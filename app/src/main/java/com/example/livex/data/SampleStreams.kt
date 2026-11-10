@@ -15,6 +15,8 @@ data class Stream(
      * Null = no ads.
      */
     val adTagUri: String? = null,
+    /** Google DAI stream for server-side ads (ImaServerSideAdInsertionMediaSource). Null = no SSAI. */
+    val dai: DaiStream? = null,
 ) {
     val format: String
         get() = when (mimeType) {
@@ -25,7 +27,11 @@ data class Stream(
 
     /** Short label for the UI, e.g. "HLS · VOD". */
     val formatLabel: String
-        get() = "$format · ${if (isLive) "Live" else "VOD"}" + if (adTagUri != null) " · Ads" else ""
+        get() = "$format · ${if (isLive) "Live" else "VOD"}" + when {
+            adTagUri != null -> " · Ads"
+            dai != null -> " · SSAI"
+            else -> ""
+        }
 }
 
 /** Public test streams (all checked to respond at the time of writing). */
@@ -124,9 +130,46 @@ object SampleStreams {
             "&ciu_szs=300x250%2C728x90&gdfp_req=1&output=vast&unviewed_position_start=1&env=vp&impl=s&nofb=1&correlator=",
     )
 
+    // --- Server-side ads (Google IMA DAI public samples, as used by the Media3 demo app) ---
+    // The stream URL is created by the DAI service per session (with ads stitched in), so [url] is
+    // only a description here; the engine builds the imadai URI from [Stream.dai].
+
+    private const val DAI = "https://dai.google.com"
+
+    /** HLS VOD with pre-, mid- and post-roll breaks stitched in by DAI. */
+    val daiVodHls = Stream(
+        id = "dai-vod-hls",
+        title = "Tears of Steel (DAI VOD)",
+        url = DAI,
+        mimeType = MimeTypes.APPLICATION_M3U8,
+        isLive = false,
+        dai = DaiStream.Vod(contentSourceId = "2528370", videoId = "tears-of-steel"),
+    )
+
+    /** HLS live channel with DAI mid-roll breaks (triggered by SCTE-35 in the source). */
+    val daiLiveHls = Stream(
+        id = "dai-live-hls",
+        title = "Big Buck Bunny (DAI live)",
+        url = DAI,
+        mimeType = MimeTypes.APPLICATION_M3U8,
+        isLive = true,
+        dai = DaiStream.Live(assetKey = "sN_IYUG8STe1ZzhIIE_ksA"),
+    )
+
+    /** DASH VOD where every ad is its own Period (multi-period MPD). */
+    val daiVodDash = Stream(
+        id = "dai-vod-dash",
+        title = "Tears of Steel (DAI VOD, multi-period DASH)",
+        url = DAI,
+        mimeType = MimeTypes.APPLICATION_MPD,
+        isLive = false,
+        dai = DaiStream.Vod(contentSourceId = "2559737", videoId = "tos-dash"),
+    )
+
     val all: List<Stream> = listOf(
         bigBuckBunny, tearsOfSteelHls, tearsOfSteelDash, liveHls, dashIfLivesim,
         adsPreRoll, adsVmapPreMidPost, adsPostRoll, adsError,
+        daiVodHls, daiLiveHls, daiVodDash,
     )
 
     fun byId(id: String?): Stream? = all.firstOrNull { it.id == id }
