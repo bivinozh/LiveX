@@ -89,6 +89,18 @@ fun PlayerScreen(
                         .padding(start = 24.dp, bottom = 24.dp, end = 24.dp + if (state.isGuideVisible) GuidePanelWidth else 0.dp),
                 )
             }
+        } else {
+            // VOD: seek bar with ad break markers (client-side VMAP or server-side DAI breaks).
+            val progress by viewModel.progress.collectAsStateWithLifecycle()
+            progress?.let {
+                VodProgressBar(
+                    progress = it,
+                    onIntent = viewModel::onIntent,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 24.dp, bottom = 24.dp, end = 24.dp + if (state.isGuideVisible) GuidePanelWidth else 0.dp),
+                )
+            }
         }
 
         // Top-right of the video area (left of the guide panel), like broadcast TV.

@@ -116,7 +116,10 @@ private fun VideoInfo(state: PlayerState, onIntent: (PlayerIntent) -> Unit) {
     Text(state.stream.formatLabel, style = MaterialTheme.typography.labelMedium, color = Muted)
     Text(state.stream.title, style = MaterialTheme.typography.titleMedium, color = Color.White)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = { onIntent(PlayerIntent.OpenManifest) }) { Text("View manifest") }
+        // DAI streams have no fixed manifest URL: DAI creates a per-session, ad-stitched one.
+        if (state.stream.dai == null) {
+            Button(onClick = { onIntent(PlayerIntent.OpenManifest) }) { Text("View manifest") }
+        }
         Button(onClick = { onIntent(PlayerIntent.ToggleStats) }) {
             Text(if (state.isStatsVisible) "Stats: ON" else "Stats: OFF")
         }

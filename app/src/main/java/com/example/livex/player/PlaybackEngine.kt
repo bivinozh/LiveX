@@ -4,7 +4,10 @@ import androidx.media3.common.Player
 import com.example.livex.data.Stream
 import androidx.media3.ui.PlayerView
 import com.example.livex.network.ThrottleMode
+import com.example.livex.player.ads.AdSeekPolicy
 import com.example.livex.player.ads.AdState
+import com.example.livex.player.ads.SeekOutcome
+import com.example.livex.player.ads.VodProgress
 import com.example.livex.player.live.LiveWindow
 import com.example.livex.qoe.QoeMetrics
 import com.example.livex.qoe.StatsState
@@ -58,8 +61,14 @@ interface PlaybackEngine {
     /** Network throttle simulator: applies to the next bytes read, without rebuilding the player. */
     fun setThrottleMode(mode: ThrottleMode)
 
-    /** Seeks relative to the current position (negative = back). */
-    fun seekBy(offsetMs: Long)
+    /** VOD content progress + ad breaks (for the seek bar markers), every 500 ms; null for live. */
+    val progress: StateFlow<VodProgress?>
+
+    /**
+     * Seeks relative to the current content position (negative = back), applying [AdSeekPolicy]:
+     * no seeking during ads, and seeking over an unwatched break plays it first.
+     */
+    fun seekBy(offsetMs: Long): SeekOutcome
 
     /** After a playback error: prepare() again, continuing from the current position. */
     fun retry()

@@ -9,6 +9,7 @@ import androidx.media3.common.AdViewProvider
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ima.ImaAdsLoader
+import androidx.media3.exoplayer.ima.ImaServerSideAdInsertionMediaSource
 import androidx.media3.ui.PlayerView
 import com.google.ads.interactivemedia.v3.api.Ad
 import com.google.ads.interactivemedia.v3.api.AdErrorEvent
@@ -28,7 +29,7 @@ import kotlin.math.roundToInt
  *   overlay. The PlayerView lives in Compose and can be recreated, so it's attached/detached here.
  */
 @OptIn(UnstableApi::class)
-class ImaAdsController(context: Context) {
+class ImaAdsController(private val context: Context) {
 
     private val log = AdEventLog()
     private val _events = MutableStateFlow<List<AdEventLog.Entry>>(emptyList())
@@ -43,6 +44,37 @@ class ImaAdsController(context: Context) {
 
     fun setPlayer(player: Player?) = adsLoader.setPlayer(player)
 
+    // --- Server-side ad insertion (IMA DAI) ---
+
+    private var serverSideLoader: ImaServerSideAdInsertionMediaSource.AdsLoader? = null
+
+    /** Which DAI breaks were already played etc., carried over when the same stream is rebuilt. */
+    private var serverSideState: ImaServerSideAdInsertionMediaSource.AdsLoader.State? = null
+
+    /**
+     * One SSAI AdsLoader per player (it binds to a single player). [keepState] = rebuilding the same
+     * stream: resume the DAI session state so watched breaks stay watched.
+     */
+    fun newServerSideLoader(keepState: Boolean): ImaServerSideAdInsertionMediaSource.AdsLoader {
+        if (!keepState) serverSideState = null
+        return ImaServerSideAdInsertionMediaSource.AdsLoader.Builder(context, adViewProvider)
+            .setAdEventListener(::onAdEvent)
+            .setAdErrorListener(::onAdError)
+            .apply { serverSideState?.let { setAdsLoaderState(it) } }
+            .build()
+            .also { serverSideLoader = it }
+    }
+
+    fun setServerSidePlayer(player: Player) {
+        serverSideLoader?.setPlayer(player)
+    }
+
+    /** Call after the player is released; keeps the state for a rebuild of the same stream. */
+    fun releaseServerSideLoader() {
+        serverSideLoader?.let { serverSideState = it.release() }
+        serverSideLoader = null
+    }
+
     fun clearEvents() {
         log.clear()
         _events.value = emptyList()
@@ -52,6 +84,8 @@ class ImaAdsController(context: Context) {
     fun release() {
         adsLoader.setPlayer(null)
         adsLoader.release()
+        releaseServerSideLoader()
+        serverSideState = null
         adViewProvider.playerView = null
     }
 
