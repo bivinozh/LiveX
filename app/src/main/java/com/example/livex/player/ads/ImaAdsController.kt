@@ -29,7 +29,11 @@ import kotlin.math.roundToInt
  *   overlay. The PlayerView lives in Compose and can be recreated, so it's attached/detached here.
  */
 @OptIn(UnstableApi::class)
-class ImaAdsController(private val context: Context) {
+class ImaAdsController(
+    private val context: Context,
+    /** Every recorded ad event (also errors), e.g. for the QoE event log. */
+    private val onEvent: (name: String, detail: String?, isError: Boolean) -> Unit = { _, _, _ -> },
+) {
 
     private val log = AdEventLog()
     private val _events = MutableStateFlow<List<AdEventLog.Entry>>(emptyList())
@@ -121,6 +125,7 @@ class ImaAdsController(private val context: Context) {
         val line = logcatText ?: entry.text
         if (isError) Log.w(TAG, line) else Log.i(TAG, line)
         _events.value = log.entries
+        onEvent(name, detail, isError)
     }
 
     /** "pre-roll · ad 1/1 · 10 s" from the IMA pod info (podIndex 0 = pre, -1 = post). */

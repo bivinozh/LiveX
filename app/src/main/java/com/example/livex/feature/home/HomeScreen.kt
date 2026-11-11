@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -38,6 +39,7 @@ import kotlinx.coroutines.flow.first
 fun HomeScreen(
     onStreamSelected: (streamId: String) -> Unit,
     modifier: Modifier = Modifier,
+    onOpenSessions: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -45,6 +47,7 @@ fun HomeScreen(
     CollectEffects(viewModel.effects) { effect ->
         when (effect) {
             is HomeEffect.NavigateToPlayer -> onStreamSelected(effect.streamId)
+            HomeEffect.NavigateToSessions -> onOpenSessions()
         }
     }
 
@@ -75,6 +78,7 @@ fun HomeContent(
     }
 }
 
+@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun StreamList(
     streams: List<Stream>,
@@ -105,11 +109,17 @@ private fun StreamList(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Text(
-                "Choose a stream",
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.padding(bottom = 8.dp),
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            ) {
+                Text(
+                    "Choose a stream",
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.weight(1f),
+                )
+                Button(onClick = { onIntent(HomeIntent.OpenSessions) }) { Text("QoE sessions") }
+            }
         }
         itemsIndexed(streams, key = { _, stream -> stream.id }) { index, stream ->
             StreamItem(

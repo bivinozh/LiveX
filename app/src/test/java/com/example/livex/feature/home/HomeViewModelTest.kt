@@ -101,6 +101,18 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `open sessions emits navigate to sessions`() = runTest {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.effects.test {
+            viewModel.onIntent(HomeIntent.OpenSessions)
+
+            assertEquals(HomeEffect.NavigateToSessions, awaitItem())
+        }
+    }
+
+    @Test
     fun `nothing is selected before the first click`() = runTest {
         val viewModel = createViewModel()
         advanceUntilIdle()
