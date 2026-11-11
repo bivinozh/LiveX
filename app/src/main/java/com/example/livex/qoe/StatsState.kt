@@ -2,6 +2,7 @@ package com.example.livex.qoe
 
 import com.example.livex.player.ads.AdEventLog
 import com.example.livex.player.ads.AdState
+import com.example.livex.player.drm.DrmStatus
 import java.util.Locale
 
 /**
@@ -38,6 +39,8 @@ data class StatsState(
     val ad: AdState = AdState(),
     /** Recent IMA ad events (loaded, started, quartiles, completed, errors), oldest first. */
     val adEvents: List<AdEventLog.Entry> = emptyList(),
+    /** Is the stream protected, and the device's Widevine level. */
+    val drm: DrmStatus = DrmStatus(),
 ) {
     data class Row(val label: String, val value: String)
 
@@ -57,6 +60,7 @@ data class StatsState(
         Row(REBUFFER_RATIO, stalls.rebufferingRatio?.let { String.format(Locale.US, "%.2f%%", it * 100) } ?: NONE),
         Row(SEEK_BUFFERING, countAndTime(stalls.seekBufferingCount, stalls.seekBufferingTimeMs)),
         Row(AD, ad.shortLabel ?: NONE),
+        Row(DRM, drm.rowText),
     )
 
     /**
@@ -94,6 +98,7 @@ data class StatsState(
         const val LIVE_OFFSET = "Live offset"
         const val TARGET_OFFSET = "Target offset"
         const val AD = "Ad"
+        const val DRM = "DRM"
         const val SPEED = "Playback speed"
         const val DROPPED_FRAMES = "Dropped frames"
         const val LOAD_ERRORS = "Load errors"
@@ -109,7 +114,9 @@ data class StatsState(
             sample: PlayerSample,
             bufferHistory: List<BufferPoint> = emptyList(),
             adEvents: List<AdEventLog.Entry> = emptyList(),
+            drm: DrmStatus = DrmStatus(),
         ) = StatsState(
+            drm = drm,
             playerState = metrics.playbackState,
             videoWidth = metrics.videoWidth,
             videoHeight = metrics.videoHeight,

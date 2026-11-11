@@ -17,6 +17,8 @@ data class Stream(
     val adTagUri: String? = null,
     /** Google DAI stream for server-side ads (ImaServerSideAdInsertionMediaSource). Null = no SSAI. */
     val dai: DaiStream? = null,
+    /** Widevine license for protected content. Null = clear (unencrypted) stream. */
+    val drm: DrmLicense? = null,
 ) {
     val format: String
         get() = when (mimeType) {
@@ -30,6 +32,7 @@ data class Stream(
         get() = "$format · ${if (isLive) "Live" else "VOD"}" + when {
             adTagUri != null -> " · Ads"
             dai != null -> " · SSAI"
+            drm != null -> " · Widevine"
             else -> ""
         }
 }
@@ -166,10 +169,48 @@ object SampleStreams {
         dai = DaiStream.Vod(contentSourceId = "2559737", videoId = "tos-dash"),
     )
 
+    // --- Widevine DRM (Google's test content + UAT license proxy, from the Media3 demo list) ---
+    // video_id picks the license POLICY: 2015_tears allows software (L3) devices,
+    // GTS_HW_SECURE_ALL only issues keys for hardware-secure (L1) decoding.
+
+    private const val WV_TEARS = "https://storage.googleapis.com/wvmedia/cenc/h264/tears"
+    private const val WV_PROXY = "https://proxy.uat.widevine.com/proxy?provider=widevine_test&video_id="
+
+    /** Widevine SD (up to 380p): plays on L3. */
+    val widevineSd = Stream(
+        id = "wv-sd",
+        title = "Tears of Steel (Widevine SD)",
+        url = "$WV_TEARS/tears_sd.mpd",
+        mimeType = MimeTypes.APPLICATION_MPD,
+        isLive = false,
+        drm = DrmLicense("${WV_PROXY}2015_tears"),
+    )
+
+    /** Widevine up to 1920×856: whether HD keys are released depends on the device level. */
+    val widevineHd = Stream(
+        id = "wv-hd",
+        title = "Tears of Steel (Widevine HD)",
+        url = "$WV_TEARS/tears.mpd",
+        mimeType = MimeTypes.APPLICATION_MPD,
+        isLive = false,
+        drm = DrmLicense("${WV_PROXY}2015_tears"),
+    )
+
+    /** Policy requires hardware-secure decoding: expected to FAIL on L3 (shows the DRM error path). */
+    val widevineL1Only = Stream(
+        id = "wv-l1-only",
+        title = "Tears of Steel (Widevine, L1 required)",
+        url = "$WV_TEARS/tears.mpd",
+        mimeType = MimeTypes.APPLICATION_MPD,
+        isLive = false,
+        drm = DrmLicense("${WV_PROXY}GTS_HW_SECURE_ALL"),
+    )
+
     val all: List<Stream> = listOf(
         bigBuckBunny, tearsOfSteelHls, tearsOfSteelDash, liveHls, dashIfLivesim,
         adsPreRoll, adsVmapPreMidPost, adsPostRoll, adsError,
         daiVodHls, daiLiveHls, daiVodDash,
+        widevineSd, widevineHd, widevineL1Only,
     )
 
     fun byId(id: String?): Stream? = all.firstOrNull { it.id == id }

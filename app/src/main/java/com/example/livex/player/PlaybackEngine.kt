@@ -6,6 +6,7 @@ import androidx.media3.ui.PlayerView
 import com.example.livex.network.ThrottleMode
 import com.example.livex.player.ads.AdSeekPolicy
 import com.example.livex.player.ads.AdState
+import com.example.livex.player.drm.WidevineInfo
 import com.example.livex.player.ads.SeekOutcome
 import com.example.livex.player.ads.VodProgress
 import com.example.livex.player.live.LiveWindow
@@ -26,6 +27,9 @@ interface PlaybackEngine {
 
     /** Stats overlay snapshot, refreshed every 500 ms (events + polled player values). */
     val stats: StateFlow<StatsState>
+
+    /** This device's Widevine capabilities (security level, HDCP); null until read. */
+    val widevine: StateFlow<WidevineInfo?>
 
     /** Ad currently playing (client-side ads), polled every 500 ms. */
     val ad: StateFlow<AdState>

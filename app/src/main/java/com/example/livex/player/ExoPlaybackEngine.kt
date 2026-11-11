@@ -33,6 +33,10 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.exoplayer.ima.ImaServerSideAdInsertionMediaSource
 import androidx.media3.exoplayer.ima.ImaServerSideAdInsertionUriBuilder
 import com.example.livex.player.ads.AdState
+import com.example.livex.player.drm.DrmStatus
+import com.example.livex.player.drm.WidevineInfo
+import com.example.livex.player.drm.WidevineInfoReader
+import androidx.media3.exoplayer.drm.DefaultDrmSessionManagerProvider
 import com.example.livex.player.ads.ImaAdsController
 import com.example.livex.player.live.LiveWindow
 import com.example.livex.network.ThrottleMode
@@ -89,6 +93,8 @@ class ExoPlaybackEngine @Inject constructor(
     private val _ad = MutableStateFlow(AdState())
     override val ad: StateFlow<AdState> = _ad.asStateFlow()
     private val _progress = MutableStateFlow<VodProgress?>(null)
+    private val _widevine = MutableStateFlow<WidevineInfo?>(null)
+    override val widevine: StateFlow<WidevineInfo?> = _widevine.asStateFlow()
     override val progress: StateFlow<VodProgress?> = _progress.asStateFlow()
 
     /** Snap-back: where to continue once the ad break we snapped to has played. */
@@ -120,6 +126,9 @@ class ExoPlaybackEngine @Inject constructor(
         get() = _player.value?.contentPosition ?: 0L
 
     init {
+        // Device DRM capabilities don't change: read once. MediaDrm talks to the DRM HAL over binder.
+        scope.launch(Dispatchers.IO) { _widevine.value = WidevineInfoReader.read() }
+
         // Buffer, live offset and speed change continuously without callbacks, so sample them.
         // Runs on the main thread: Player getters must be called on the player's application looper.
         scope.launch {
@@ -131,7 +140,10 @@ class ExoPlaybackEngine @Inject constructor(
                     tracker.onTick(sample.bufferedDurationMs, nowMs)
                     val metrics = tracker.metrics.value
                     bufferHistory.add(BufferPoint(nowMs, sample.bufferedDurationMs, metrics.stalls.isStalled))
-                    _stats.value = StatsState.from(metrics, sample, bufferHistory.points, ads.events.value)
+                    _stats.value = StatsState.from(
+                        metrics, sample, bufferHistory.points, ads.events.value,
+                        drm = DrmStatus(isProtected = currentStream?.drm != null, device = _widevine.value),
+                    )
                     _live.value = current.liveWindow()
                     _ad.value = sample.ad
                     _progress.value = current.vodProgress()
@@ -215,6 +227,19 @@ class ExoPlaybackEngine @Inject constructor(
             .setAdsId(stream.id)
             .build()
 
+    /**
+     * Protected stream on a non-L1 device: don't let ABR select renditions whose keys the license
+     * won't include (HD on L3), otherwise playback dies with "requested key has not been loaded"
+     * the moment ABR switches up. The device level is read now if the background read hasn't finished.
+     */
+    private fun capProtectedVideo(player: ExoPlayer) {
+        val info = _widevine.value ?: WidevineInfoReader.read().also { _widevine.value = it }
+        val maxHeight = info.maxProtectedVideoHeight ?: return
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setMaxVideoSize(Int.MAX_VALUE, maxHeight)
+            .build()
+    }
+
     override fun setAdView(view: PlayerView?) {
         ads.adViewProvider.playerView = view
     }
@@ -257,6 +282,7 @@ class ExoPlaybackEngine @Inject constructor(
         ads.setServerSidePlayer(newPlayer)
         ads.clearEvents()
         newPlayer.addListener(snapBackListener)
+        if (stream.drm != null) capProtectedVideo(newPlayer)
         newPlayer.addAnalyticsListener(tracker)
         // Debug builds: log every load, format switch and state change to logcat (tag "EventLogger").
         // The quickest way to see what ABR downloads (downstreamFormat) vs. what plays (videoInputFormat).
@@ -283,6 +309,15 @@ class ExoPlaybackEngine @Inject constructor(
                 // Client-side ads: DefaultMediaSourceFactory sees the AdsConfiguration and wraps the
                 // content in an AdsMediaSource driven by ImaAdsLoader.
                 stream.adTagUri?.let { setAdsConfiguration(MediaItem.AdsConfiguration.Builder(Uri.parse(it)).build()) }
+                // Widevine: the DASH source sees the PSSH in the MPD; the DRM session posts it as a
+                // license request to this URL and installs the returned keys in the CDM.
+                stream.drm?.let { license ->
+                    setDrmConfiguration(
+                        MediaItem.DrmConfiguration.Builder(C.WIDEVINE_UUID)
+                            .setLicenseUri(license.licenseUrl)
+                            .build(),
+                    )
+                }
             }
             .build()
         if (resumePositionMs != null) {
@@ -399,8 +434,12 @@ class ExoPlaybackEngine @Inject constructor(
 
         // DefaultMediaSourceFactory picks HlsMediaSource / DashMediaSource / ProgressiveMediaSource
         // per MediaItem (from its MIME type, else the URI extension); all of them load through our factory.
+        // DRM license requests: through the same OkHttp client and User-Agent (not throttled).
+        val drmSessionManagerProvider = DefaultDrmSessionManagerProvider().apply { setDrmHttpDataSourceFactory(httpFactory) }
+
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
             .setDataSourceFactory(dataSourceFactory)
+            .setDrmSessionManagerProvider(drmSessionManagerProvider)
             // Client-side ads: MediaItems with an AdsConfiguration get an AdsMediaSource that asks
             // the ImaAdsLoader for ads and draws ad UI in the PlayerView (AdViewProvider).
             // Ad MEDIA (the MP4s from the VAST) loads through the same data source; the VAST/VMAP

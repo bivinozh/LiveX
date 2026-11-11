@@ -73,7 +73,12 @@ class PlayerViewModel @Inject constructor(
                 return
             }
             setState {
-                copy(playback = PlayerUiState.Error(PlaybackErrors.message(error), error.errorCodeName))
+                copy(
+                    playback = PlayerUiState.Error(
+                        PlaybackErrors.message(error, isProtected = stream.drm != null),
+                        error.errorCodeName,
+                    ),
+                )
             }
         }
     }
@@ -117,6 +122,10 @@ class PlayerViewModel @Inject constructor(
         // Content: changes only at ad boundaries. During an ad: every 500 ms tick (remaining time).
         engine.ad
             .onEach { ad -> setState { copy(ad = ad) } }
+            .launchIn(viewModelScope)
+
+        engine.widevine
+            .onEach { info -> setState { copy(widevine = info) } }
             .launchIn(viewModelScope)
     }
 
