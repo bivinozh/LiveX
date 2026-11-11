@@ -19,8 +19,13 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.util.EventLogger
 import com.example.livex.data.Stream
+import com.example.livex.qoe.EndReason
+import com.example.livex.qoe.QoeEventBus
+import com.example.livex.qoe.QoeEventLogger
 import com.example.livex.qoe.QoeMetrics
 import com.example.livex.qoe.QoeTracker
+import com.example.livex.network.LiveXLoadErrorPolicy
+import androidx.media3.common.PlaybackException
 import com.example.livex.network.NetworkThrottle
 import androidx.media3.ui.PlayerView
 import com.example.livex.data.DaiStream
@@ -71,10 +76,14 @@ class ExoPlaybackEngine @Inject constructor(
     private val okHttpClient: OkHttpClient,
     /** Shared with the manifest viewer (see NetworkModule.provideUserAgent). */
     @param:UserAgent private val userAgent: String,
+    qoeEventBus: QoeEventBus,
 ) : PlaybackEngine {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val tracker = QoeTracker()
+
+    /** Structured QoE events (session, VST, stalls, switches, ads, errors, EBVS) onto the app-wide bus. */
+    private val qoeEvents = QoeEventLogger(emit = qoeEventBus::emit)
+    private val tracker = QoeTracker(onUpdate = { qoeEvents.onMetrics(it, SystemClock.elapsedRealtime()) })
 
     private var currentStream: Stream? = null
     private var resumeOnStart = false
@@ -89,7 +98,9 @@ class ExoPlaybackEngine @Inject constructor(
     private val period = Timeline.Period()
 
     // Client-side ads (IMA). One loader for the engine's lifetime; attached to each new player.
-    private val ads = ImaAdsController(context)
+    private val ads = ImaAdsController(context) { name, detail, isError ->
+        qoeEvents.onAdEvent(name, detail, isError, SystemClock.elapsedRealtime())
+    }
     private val _ad = MutableStateFlow(AdState())
     override val ad: StateFlow<AdState> = _ad.asStateFlow()
     private val _progress = MutableStateFlow<VodProgress?>(null)
@@ -113,6 +124,20 @@ class ExoPlaybackEngine @Inject constructor(
             val player = _player.value ?: return
             // ExoPlayer may already resume at the requested position; only seek if it didn't.
             if (kotlin.math.abs(player.contentPosition - target) > 1_000) player.seekTo(target)
+        }
+    }
+
+    /** Fatal errors and the natural end of a session, for the QoE event log. */
+    private val sessionListener = object : Player.Listener {
+        override fun onPlayerError(error: PlaybackException) {
+            val message = PlaybackErrors.message(error, isProtected = currentStream?.drm != null)
+            qoeEvents.onPlayerError(error.errorCodeName, message, SystemClock.elapsedRealtime())
+        }
+
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            if (playbackState == Player.STATE_ENDED) {
+                qoeEvents.endSession(SystemClock.elapsedRealtime(), EndReason.COMPLETED)
+            }
         }
     }
 
@@ -282,13 +307,17 @@ class ExoPlaybackEngine @Inject constructor(
         ads.setServerSidePlayer(newPlayer)
         ads.clearEvents()
         newPlayer.addListener(snapBackListener)
+        newPlayer.addListener(sessionListener)
         if (stream.drm != null) capProtectedVideo(newPlayer)
         newPlayer.addAnalyticsListener(tracker)
         // Debug builds: log every load, format switch and state change to logcat (tag "EventLogger").
         // The quickest way to see what ABR downloads (downstreamFormat) vs. what plays (videoInputFormat).
         if (isDebuggable) newPlayer.addAnalyticsListener(EventLogger())
         // The play request: startup (VST) is measured from here to the first rendered frame.
-        tracker.reset(nowMs = SystemClock.elapsedRealtime())
+        // A new session per play request; a rebuild ends the previous one as RESTARTED.
+        val playRequestAtMs = SystemClock.elapsedRealtime()
+        qoeEvents.startSession(stream, playRequestAtMs, System.currentTimeMillis())
+        tracker.reset(nowMs = playRequestAtMs)
         bufferHistory.clear()
 
         val mediaItem = MediaItem.Builder()
@@ -388,6 +417,8 @@ class ExoPlaybackEngine @Inject constructor(
 
     override fun release() {
         scope.cancel()
+        // The viewer left (Back). Before the first frame, this is an EBVS.
+        qoeEvents.endSession(SystemClock.elapsedRealtime(), EndReason.EXIT)
         releasePlayer()
         // After the player: setPlayer(null) + release() frees the IMA SDK and its ad display container.
         ads.release()
@@ -399,6 +430,7 @@ class ExoPlaybackEngine @Inject constructor(
             ads.setPlayer(null)
             it.removeAnalyticsListener(tracker)
             it.removeListener(snapBackListener)
+            it.removeListener(sessionListener)
             it.release()
         }
         _player.value = null
@@ -440,6 +472,8 @@ class ExoPlaybackEngine @Inject constructor(
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
             .setDataSourceFactory(dataSourceFactory)
             .setDrmSessionManagerProvider(drmSessionManagerProvider)
+            // Retries + backoff for failed manifest/segment requests (manifests get more, faster retries).
+            .setLoadErrorHandlingPolicy(LiveXLoadErrorPolicy())
             // Client-side ads: MediaItems with an AdsConfiguration get an AdsMediaSource that asks
             // the ImaAdsLoader for ads and draws ad UI in the PlayerView (AdViewProvider).
             // Ad MEDIA (the MP4s from the VAST) loads through the same data source; the VAST/VMAP

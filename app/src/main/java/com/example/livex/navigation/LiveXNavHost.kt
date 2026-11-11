@@ -6,6 +6,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.livex.feature.home.HomeScreen
+import com.example.livex.feature.sessions.SessionsScreen
 import com.example.livex.manifest.ManifestScreen
 import com.example.livex.settings.BufferSettingsScreen
 import com.example.livex.ui.player.PlayerScreen
@@ -29,11 +30,18 @@ data class ManifestRoute(val streamId: String)
 @Serializable
 data object BufferSettingsRoute
 
+/** Per-session QoE summaries from Room. */
+@Serializable
+data object SessionsRoute
+
 @Composable
 fun LiveXNavHost(navController: NavHostController = rememberNavController()) {
     NavHost(navController = navController, startDestination = HomeRoute) {
         composable<HomeRoute> {
-            HomeScreen(onStreamSelected = { streamId -> navController.navigate(PlayerRoute(streamId)) })
+            HomeScreen(
+                onStreamSelected = { streamId -> navController.navigate(PlayerRoute(streamId)) },
+                onOpenSessions = { navController.navigate(SessionsRoute) },
+            )
         }
         // Each destination gets its own ViewModelStore: leaving the player (Back) clears
         // PlayerViewModel, whose onCleared() releases the ExoPlayer.
@@ -49,6 +57,9 @@ fun LiveXNavHost(navController: NavHostController = rememberNavController()) {
         }
         composable<ManifestRoute> {
             ManifestScreen()
+        }
+        composable<SessionsRoute> {
+            SessionsScreen()
         }
     }
 }

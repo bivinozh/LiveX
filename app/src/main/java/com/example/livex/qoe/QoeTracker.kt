@@ -15,7 +15,10 @@ import java.io.IOException
 
 /** Bridges ExoPlayer analytics events into [QoeCalculator] and publishes the result. */
 @OptIn(UnstableApi::class)
-class QoeTracker : AnalyticsListener {
+class QoeTracker(
+    /** Called with every new snapshot, synchronously (unlike [metrics], nothing is conflated). */
+    private val onUpdate: (QoeMetrics) -> Unit = {},
+) : AnalyticsListener {
 
     private val calculator = QoeCalculator()
     private val _metrics = MutableStateFlow(QoeMetrics())
@@ -83,6 +86,8 @@ class QoeTracker : AnalyticsListener {
 
     private inline fun update(block: QoeCalculator.() -> Unit) {
         calculator.block()
-        _metrics.value = calculator.metrics
+        val snapshot = calculator.metrics
+        _metrics.value = snapshot
+        onUpdate(snapshot)
     }
 }

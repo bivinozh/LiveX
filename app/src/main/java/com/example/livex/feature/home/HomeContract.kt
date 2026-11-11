@@ -20,8 +20,10 @@ sealed interface HomeIntent : UiIntent {
     data object Load : HomeIntent
     data object Retry : HomeIntent
     data class StreamClicked(val streamId: String) : HomeIntent
+    data object OpenSessions : HomeIntent
 }
 
 sealed interface HomeEffect : UiEffect {
     data class NavigateToPlayer(val streamId: String) : HomeEffect
+    data object NavigateToSessions : HomeEffect
 }

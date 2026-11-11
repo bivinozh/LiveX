@@ -58,6 +58,15 @@ class HomeContentTest {
     }
 
     @Test
+    fun sessionsButton_sendsOpenSessions() {
+        setContent(HomeState(streams = SampleStreams.all))
+
+        composeRule.onNodeWithText("QoE sessions").performDpadClick()
+
+        assertEquals(listOf<HomeIntent>(HomeIntent.OpenSessions), sentIntents)
+    }
+
+    @Test
     fun noSelection_focusesFirstStream() {
         setContent(HomeState(streams = SampleStreams.all))
 

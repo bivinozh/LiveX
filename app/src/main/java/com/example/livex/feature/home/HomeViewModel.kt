@@ -25,6 +25,7 @@ class HomeViewModel @Inject constructor(
                 setState { copy(selectedStreamId = intent.streamId) }
                 sendEffect(HomeEffect.NavigateToPlayer(intent.streamId))
             }
+            HomeIntent.OpenSessions -> sendEffect(HomeEffect.NavigateToSessions)
         }
     }
 
