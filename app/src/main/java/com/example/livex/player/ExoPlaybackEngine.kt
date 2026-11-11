@@ -61,7 +61,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import javax.inject.Inject
@@ -90,6 +90,7 @@ class ExoPlaybackEngine @Inject constructor(
     private val tracker = QoeTracker(onUpdate = { qoeEvents.onMetrics(it, SystemClock.elapsedRealtime()) })
 
     private var currentStream: Stream? = null
+    private var currentConfig: PlayerConfig? = null
     private var resumeOnStart = false
     private val _player = MutableStateFlow<ExoPlayer?>(null)
     override val player: StateFlow<Player?> = _player.asStateFlow()
@@ -155,15 +156,26 @@ class ExoPlaybackEngine @Inject constructor(
         get() = _player.value?.contentPosition ?: 0L
 
     init {
-        // Device DRM capabilities don't change: read once. MediaDrm talks to the DRM HAL over binder.
+        // Device DRM capabilities don't change: read once. MediaDrm talks to the DRM HAL over binder,
+        // so never on the main thread. Until it's known, protected streams are capped at SD.
         scope.launch(Dispatchers.IO) { _widevine.value = WidevineInfoReader.read() }
+        // When the level arrives (Main): lift or keep the cap on the player that's already playing.
+        scope.launch { _widevine.collect { _player.value?.let(::applyVideoLimits) } }
 
         // Buffer, live offset and speed change continuously without callbacks, so sample them.
         // Runs on the main thread: Player getters must be called on the player's application looper.
+        // Only while there IS a player: the engine is app-wide, and an idle 500 ms timer would wake
+        // the main thread for the whole life of the process. collectLatest cancels the loop on change.
         scope.launch {
-            while (isActive) {
-                val current = _player.value
-                if (current != null) {
+            _player.collectLatest { current ->
+                if (current == null) {
+                    _stats.value = StatsState()
+                    _live.value = null
+                    _ad.value = AdState()
+                    _progress.value = null
+                    return@collectLatest
+                }
+                while (true) {
                     val nowMs = SystemClock.elapsedRealtime()
                     val sample = current.sample()
                     tracker.onTick(sample.bufferedDurationMs, nowMs)
@@ -176,13 +188,8 @@ class ExoPlaybackEngine @Inject constructor(
                     _live.value = current.liveWindow()
                     _ad.value = sample.ad
                     _progress.value = current.vodProgress()
-                } else {
-                    _stats.value = StatsState()
-                    _live.value = null
-                    _ad.value = AdState()
-                    _progress.value = null
+                    delay(STATS_INTERVAL)
                 }
-                delay(STATS_INTERVAL)
             }
         }
     }
@@ -257,15 +264,20 @@ class ExoPlaybackEngine @Inject constructor(
             .build()
 
     /**
-     * Protected stream on a non-L1 device: don't let ABR select renditions whose keys the license
-     * won't include (HD on L3), otherwise playback dies with "requested key has not been loaded"
-     * the moment ABR switches up. The device level is read now if the background read hasn't finished.
+     * Largest rendition ABR may pick (see [VideoLimits]): the data-saver cap and, for protected
+     * streams on a non-L1 device, SD, so ABR never switches to a rendition whose key the license
+     * didn't include ("requested key has not been loaded"). Never blocks: an unknown Widevine level
+     * means SD for now, re-applied when the background read completes.
      */
-    private fun capProtectedVideo(player: ExoPlayer) {
-        val info = _widevine.value ?: WidevineInfoReader.read().also { _widevine.value = it }
-        val maxHeight = info.maxProtectedVideoHeight ?: return
+    private fun applyVideoLimits(player: ExoPlayer) {
+        val config = currentConfig ?: return
+        val (maxWidth, maxHeight) = VideoLimits.maxVideoSize(
+            dataSaver = config.dataSaverAbr,
+            isProtected = currentStream?.drm != null,
+            widevine = _widevine.value,
+        )
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-            .setMaxVideoSize(Int.MAX_VALUE, maxHeight)
+            .setMaxVideoSize(maxWidth, maxHeight)
             .build()
     }
 
@@ -302,6 +314,7 @@ class ExoPlaybackEngine @Inject constructor(
         val resumePositionMs = startPositionMs ?: _player.value?.contentPosition
             ?.takeIf { sameStream && !stream.isLive }
         currentStream = stream
+        currentConfig = config
         releasePlayer()
         resumeAfterAdMs = null
 
@@ -312,7 +325,7 @@ class ExoPlaybackEngine @Inject constructor(
         ads.clearEvents()
         newPlayer.addListener(snapBackListener)
         newPlayer.addListener(sessionListener)
-        if (stream.drm != null) capProtectedVideo(newPlayer)
+        applyVideoLimits(newPlayer)
         newPlayer.addAnalyticsListener(tracker)
         // Debug builds: log every load, format switch and state change to logcat (tag "EventLogger").
         // The quickest way to see what ABR downloads (downstreamFormat) vs. what plays (videoInputFormat).
@@ -433,7 +446,10 @@ class ExoPlaybackEngine @Inject constructor(
         releasePlayer()
         // Forget the stream: reopening it later is a fresh start (position 0, new DAI session).
         currentStream = null
+        currentConfig = null
         resumeOnStart = false
+        // The engine outlives the screen: the next screen starts with "Network: Unlimited", so must the link.
+        throttle.mode = ThrottleMode.UNLIMITED
         // The engine itself (stats loop, IMA loader, throttle) lives on for the next start(); with
         // no player, PlaybackService releases its MediaSession and stops (notification goes away).
     }
@@ -517,12 +533,7 @@ class ExoPlaybackEngine @Inject constructor(
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
 
-        // Topic: ABR
-        if (config.dataSaverAbr) {
-            player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-                .setMaxVideoSize(AbrProfile.DATA_SAVER_MAX_WIDTH, AbrProfile.DATA_SAVER_MAX_HEIGHT)
-                .build()
-        }
+        // Topic: ABR. Size limits (data saver, DRM cap) are applied by start() via applyVideoLimits.
         return player
     }
 }
