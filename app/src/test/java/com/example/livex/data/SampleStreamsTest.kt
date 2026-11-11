@@ -1,5 +1,6 @@
 package com.example.livex.data
 
+import androidx.media3.common.MimeTypes
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -46,6 +47,20 @@ class SampleStreamsTest {
     @Test
     fun `a stream uses client-side or server-side ads, never both`() {
         SampleStreams.all.forEach { assertFalse(it.title, it.adTagUri != null && it.dai != null) }
+    }
+
+    @Test
+    fun `widevine samples are DASH VOD with a license URL`() {
+        val drm = SampleStreams.all.filter { it.drm != null }
+
+        assertEquals(listOf(SampleStreams.widevineSd, SampleStreams.widevineHd, SampleStreams.widevineL1Only), drm)
+        drm.forEach {
+            assertEquals(MimeTypes.APPLICATION_MPD, it.mimeType)
+            assertFalse(it.isLive)
+            assertTrue(it.drm!!.licenseUrl.startsWith("https://proxy.uat.widevine.com/proxy"))
+        }
+        assertTrue(SampleStreams.widevineL1Only.drm!!.licenseUrl.contains("GTS_HW_SECURE_ALL"))
+        assertEquals("DASH · VOD · Widevine", SampleStreams.widevineSd.formatLabel)
     }
 
     @Test

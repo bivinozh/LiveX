@@ -7,6 +7,7 @@ import com.example.livex.data.Topics
 import com.example.livex.navigation.PlayerRoute
 import com.example.livex.player.ads.AdBreakKind
 import com.example.livex.player.ads.AdState
+import com.example.livex.player.drm.WidevineInfo
 import com.example.livex.player.ads.SeekOutcome
 import com.example.livex.player.ads.VodProgress
 import com.example.livex.player.live.LiveLatency
@@ -411,6 +412,16 @@ class PlayerViewModelTest {
         engine.progress.value = progress
 
         assertEquals(progress, viewModel.progress.value)
+    }
+
+    @Test
+    fun `device widevine level flows from the engine into state`() = runTest {
+        val l1 = WidevineInfo.Available("L1", "HDCP-2.2", null)
+        engine.widevine.value = l1
+
+        advanceUntilIdle()
+
+        assertEquals(l1, viewModel.state.value.widevine)
     }
 
     @Test

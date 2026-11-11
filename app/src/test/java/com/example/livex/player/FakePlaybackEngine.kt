@@ -5,6 +5,7 @@ import androidx.media3.ui.PlayerView
 import com.example.livex.data.Stream
 import com.example.livex.network.ThrottleMode
 import com.example.livex.player.ads.AdState
+import com.example.livex.player.drm.WidevineInfo
 import com.example.livex.player.ads.SeekOutcome
 import com.example.livex.player.ads.VodProgress
 import com.example.livex.player.live.LiveWindow
@@ -21,6 +22,7 @@ class FakePlaybackEngine : PlaybackEngine {
     override var currentPositionMs: Long = 0
     override val live = MutableStateFlow<LiveWindow?>(null)
     override val ad = MutableStateFlow(AdState())
+    override val widevine = MutableStateFlow<WidevineInfo?>(null)
     override val progress = MutableStateFlow<VodProgress?>(null)
 
     /** What the next seekBy() reports (the real engine applies AdSeekPolicy). */

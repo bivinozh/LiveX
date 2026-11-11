@@ -91,15 +91,50 @@ class PlaybackErrorsTest {
     }
 
     @Test
-    fun `drm errors explain the stream could not be unlocked`() {
-        listOf(
-            PlaybackException.ERROR_CODE_DRM_SCHEME_UNSUPPORTED,
-            PlaybackException.ERROR_CODE_DRM_PROVISIONING_FAILED,
-            PlaybackException.ERROR_CODE_DRM_LICENSE_ACQUISITION_FAILED,
-            PlaybackException.ERROR_CODE_DRM_LICENSE_EXPIRED,
-        ).forEach { code ->
-            assertEquals(PlaybackErrors.DRM, PlaybackErrors.message(error(code)))
+    fun `each drm failure gets its own explanation`() {
+        mapOf(
+            PlaybackException.ERROR_CODE_DRM_SCHEME_UNSUPPORTED to PlaybackErrors.DRM_UNSUPPORTED,
+            PlaybackException.ERROR_CODE_DRM_PROVISIONING_FAILED to PlaybackErrors.DRM_PROVISIONING,
+            PlaybackException.ERROR_CODE_DRM_CONTENT_ERROR to PlaybackErrors.DRM_CONTENT,
+            PlaybackException.ERROR_CODE_DRM_LICENSE_ACQUISITION_FAILED to PlaybackErrors.DRM_LICENSE_DENIED,
+            PlaybackException.ERROR_CODE_DRM_DISALLOWED_OPERATION to PlaybackErrors.DRM_SECURITY_LEVEL,
+            PlaybackException.ERROR_CODE_DRM_SYSTEM_ERROR to PlaybackErrors.DRM_SYSTEM,
+            PlaybackException.ERROR_CODE_DRM_DEVICE_REVOKED to PlaybackErrors.DRM_REVOKED,
+            PlaybackException.ERROR_CODE_DRM_LICENSE_EXPIRED to PlaybackErrors.DRM_EXPIRED,
+            PlaybackException.ERROR_CODE_DRM_UNSPECIFIED to PlaybackErrors.DRM,
+        ).forEach { (code, expected) ->
+            assertEquals("code $code", expected, PlaybackErrors.message(error(code)))
         }
+    }
+
+    @Test
+    fun `native drm codes hidden in decoder errors are recognised`() {
+        // Seen on the L3 emulator: HD key not in the license -> MediaCodec error -2001 -> DECODING_FAILED.
+        assertEquals(PlaybackErrors.DRM_KEY_MISSING, PlaybackErrors.drmDecodeMessage(-2001))
+        assertEquals(PlaybackErrors.DRM_EXPIRED, PlaybackErrors.drmDecodeMessage(-2002))
+        assertEquals(PlaybackErrors.DRM_OUTPUT_PROTECTION, PlaybackErrors.drmDecodeMessage(-2011))
+        assertEquals(PlaybackErrors.DRM, PlaybackErrors.drmDecodeMessage(-2005))
+        assertEquals(null, PlaybackErrors.drmDecodeMessage(-1)) // a genuine decoder problem
+        assertEquals(null, PlaybackErrors.drmDecodeMessage(0))
+    }
+
+    @Test
+    fun `a decoder failure on a protected stream is reported as a decryption failure`() {
+        // Seen on the L3 emulator with an L1-only license: the codec dies while decrypting and
+        // ExoPlayer only reports DECODING_FAILED (IllegalStateException), with no DRM code left.
+        val decodingFailed = error(PlaybackException.ERROR_CODE_DECODING_FAILED)
+
+        assertEquals(PlaybackErrors.DRM_DECRYPT_FAILED, PlaybackErrors.message(decodingFailed, isProtected = true))
+        assertEquals(PlaybackErrors.DECODER, PlaybackErrors.message(decodingFailed, isProtected = false))
+    }
+
+    @Test
+    fun `license server http errors say whether access or the server failed`() {
+        val forbidden = error(PlaybackException.ERROR_CODE_DRM_LICENSE_ACQUISITION_FAILED, httpStatus(403).cause)
+        val serverError = error(PlaybackException.ERROR_CODE_DRM_LICENSE_ACQUISITION_FAILED, httpStatus(500).cause)
+
+        assertEquals(PlaybackErrors.DRM_LICENSE_FORBIDDEN, PlaybackErrors.message(forbidden))
+        assertTrue(PlaybackErrors.message(serverError).contains("500"))
     }
 
     @Test

@@ -73,6 +73,19 @@ class PlayerViewModelPlaybackStateTest {
     }
 
     @Test
+    fun `decoder failures on a widevine stream are explained as DRM`() {
+        val drmViewModel = PlayerViewModel(
+            FakePlaybackEngine(),
+            FakeBufferSettingsRepository(),
+            SavedStateHandle(mapOf(PlayerViewModel.KEY_STREAM_ID to SampleStreams.widevineL1Only.id)),
+        )
+
+        drmViewModel.playerListener.onPlayerError(error(PlaybackException.ERROR_CODE_DECODING_FAILED))
+
+        assertEquals(PlaybackErrors.DRM_DECRYPT_FAILED, (drmViewModel.state.value.playback as PlayerUiState.Error).message)
+    }
+
+    @Test
     fun `the idle state that follows an error does not hide the error`() {
         viewModel.playerListener.onPlayerError(error(PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED))
         viewModel.playerListener.onPlaybackStateChanged(Player.STATE_IDLE)

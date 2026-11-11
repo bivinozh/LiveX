@@ -9,6 +9,7 @@ import com.example.livex.data.Topic
 import com.example.livex.data.Topics
 import com.example.livex.network.ThrottleMode
 import com.example.livex.player.ads.AdState
+import com.example.livex.player.drm.WidevineInfo
 import com.example.livex.player.live.LiveLatency
 import com.example.livex.qoe.QoeMetrics
 
@@ -28,6 +29,8 @@ data class PlayerState(
     val playback: PlayerUiState = PlayerUiState.Idle,
     /** Client-side ad playing right now (for the on-video AD badge). */
     val ad: AdState = AdState(),
+    /** This device's Widevine level (shown for protected streams). */
+    val widevine: WidevineInfo? = null,
 ) : UiState {
     val topic: Topic get() = topics[topicIndex]
     val isOptimizationEnabled: Boolean

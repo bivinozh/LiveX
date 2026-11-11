@@ -3,6 +3,8 @@ package com.example.livex.qoe
 import com.example.livex.player.ads.AdBreakKind
 import com.example.livex.player.ads.AdEventLog
 import com.example.livex.player.ads.AdState
+import com.example.livex.player.drm.DrmStatus
+import com.example.livex.player.drm.WidevineInfo
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -149,6 +151,18 @@ class StatsStateTest {
     }
 
     @Test
+    fun `drm row shows the device widevine level for protected streams`() {
+        val l3 = WidevineInfo.Available("L3", null, null)
+
+        assertEquals("Widevine L3", rowValue(StatsState(drm = DrmStatus(isProtected = true, device = l3)), StatsState.DRM))
+        assertEquals("Clear", rowValue(StatsState(drm = DrmStatus(isProtected = false, device = l3)), StatsState.DRM))
+        assertEquals(
+            "No Widevine",
+            rowValue(StatsState(drm = DrmStatus(isProtected = true, device = WidevineInfo.Unavailable)), StatsState.DRM),
+        )
+    }
+
+    @Test
     fun `unknown values show a dash`() {
         val stats = StatsState()
 
@@ -178,6 +192,7 @@ class StatsStateTest {
                 StatsState.REBUFFER_RATIO,
                 StatsState.SEEK_BUFFERING,
                 StatsState.AD,
+                StatsState.DRM,
             ),
             StatsState().rows().map { it.label },
         )
