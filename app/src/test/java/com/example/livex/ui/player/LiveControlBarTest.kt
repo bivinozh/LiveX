@@ -30,11 +30,32 @@ class LiveControlBarTest {
     val composeRule = createComposeRule()
 
     private val sent = mutableListOf<PlayerIntent>()
+    private var playPauseCount = 0
 
-    private fun setContent(live: LiveWindow, latency: LiveLatency = LiveLatency.STANDARD) {
+    private fun setContent(live: LiveWindow, latency: LiveLatency = LiveLatency.STANDARD, isPlaying: Boolean = true) {
         composeRule.setContent {
-            LiveXTheme { LiveControlBar(live = live, latency = latency, onIntent = { sent += it }) }
+            LiveXTheme {
+                LiveControlBar(
+                    live = live,
+                    latency = latency,
+                    onIntent = { sent += it },
+                    isPlaying = isPlaying,
+                    onPlayPause = { playPauseCount++ },
+                )
+            }
         }
+    }
+
+    @Test
+    fun pausedLive_showsPlay_andOkOnTheDvrBarToggles() {
+        setContent(behind, isPlaying = false)
+
+        composeRule.onNodeWithText("▶ Play").assertExists()
+        val bar = composeRule.onNodeWithTag(DVR_BAR_TAG)
+        bar.performSemanticsAction(SemanticsActions.RequestFocus)
+        bar.performKeyInput { pressKey(Key.Enter) }
+
+        assertEquals(1, playPauseCount)
     }
 
     private val behind = LiveWindow(windowDurationMs = 60_000, positionMs = 30_000, defaultPositionMs = 50_000, targetOffsetMs = 10_000)

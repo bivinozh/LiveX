@@ -1,5 +1,6 @@
 package com.example.livex.ui.player
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -46,6 +47,9 @@ private val Muted = Color(0xFFB0BEC5)
 /** Width of the guide panel on the right; the status overlay centers itself in the space left of it. */
 val GuidePanelWidth = 460.dp
 
+/** Room the bottom bars leave on the right for the "Show guide" button while the guide is hidden. */
+val ShowGuideButtonSpace = 180.dp
+
 /** Stateless guide drawn on top of the video: topic description, guidance, optimization demo and live metrics. */
 @Composable
 fun GuideOverlay(
@@ -53,11 +57,16 @@ fun GuideOverlay(
     onIntent: (PlayerIntent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // TV Back convention: Back first dismisses what's on top of the video; only then does it leave
+    // the player (the NavHost handles that Back when this handler is disabled).
+    BackHandler(enabled = state.isGuideVisible) { onIntent(PlayerIntent.ToggleGuide) }
+
     Box(modifier = modifier.fillMaxSize()) {
         if (state.isGuideVisible) {
             GuidePanel(state, onIntent, Modifier.align(Alignment.CenterEnd))
         } else {
-            ShowGuideButton(onIntent, Modifier.align(Alignment.BottomEnd).padding(32.dp))
+            // Bottom-right; the seek bars stop short of it (ShowGuideButtonSpace).
+            ShowGuideButton(onIntent, Modifier.align(Alignment.BottomEnd).padding(24.dp))
         }
     }
 }

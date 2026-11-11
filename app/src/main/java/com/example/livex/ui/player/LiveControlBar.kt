@@ -18,6 +18,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -62,6 +64,9 @@ fun LiveControlBar(
     latency: LiveLatency,
     onIntent: (PlayerIntent) -> Unit,
     modifier: Modifier = Modifier,
+    isPlaying: Boolean = false,
+    onPlayPause: () -> Unit = {},
+    seekBarFocus: FocusRequester = remember { FocusRequester() },
 ) {
     Column(
         modifier = modifier
@@ -76,6 +81,8 @@ fun LiveControlBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            // Pausing live = DVR: the position falls behind the edge; GO LIVE catches up.
+            PlayPauseButton(isPlaying, onPlayPause)
             Text(
                 live.statusText,
                 style = MaterialTheme.typography.titleSmall,
@@ -94,13 +101,18 @@ fun LiveControlBar(
             }
         }
         // Tick = GO LIVE point (live edge − target offset).
-        DvrSeekBar(live, onSeekBy = { onIntent(PlayerIntent.SeekBy(it)) })
+        DvrSeekBar(live, onSeekBy = { onIntent(PlayerIntent.SeekBy(it)) }, onPlayPause, seekBarFocus)
     }
 }
 
 /** Track = the DVR window; fill = playhead; tick = default position (live edge − target offset). */
 @Composable
-private fun DvrSeekBar(live: LiveWindow, onSeekBy: (Long) -> Unit) {
+private fun DvrSeekBar(
+    live: LiveWindow,
+    onSeekBy: (Long) -> Unit,
+    onPlayPause: () -> Unit,
+    focusRequester: FocusRequester,
+) {
     var focused by remember { mutableStateOf(false) }
     Canvas(
         modifier = Modifier
@@ -108,12 +120,14 @@ private fun DvrSeekBar(live: LiveWindow, onSeekBy: (Long) -> Unit) {
             .height(18.dp)
             .testTag(DVR_BAR_TAG)
             .semantics { contentDescription = "DVR seek bar: ${live.statusText}" }
+            .focusRequester(focusRequester)
             .onFocusChanged { focused = it.isFocused }
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
                 when (event.key) {
                     Key.DirectionLeft -> { onSeekBy(-DVR_STEP_MS); true }
                     Key.DirectionRight -> { onSeekBy(DVR_STEP_MS); true }
+                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> { onPlayPause(); true }
                     else -> false
                 }
             }
