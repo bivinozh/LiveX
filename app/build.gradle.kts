@@ -82,6 +82,8 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer.hls)
     implementation(libs.androidx.media3.exoplayer.dash)
     implementation(libs.androidx.media3.ui)
+    // MediaSessionService + MediaController: background playback, media notification, lock screen
+    implementation(libs.androidx.media3.session)
     implementation(libs.androidx.media3.datasource.okhttp)
     // Client-side ad insertion: ImaAdsLoader (pulls in the Google IMA SDK)
     implementation(libs.androidx.media3.exoplayer.ima)

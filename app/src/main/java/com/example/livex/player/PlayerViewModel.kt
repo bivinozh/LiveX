@@ -8,6 +8,7 @@ import androidx.media3.common.Player
 import androidx.media3.ui.PlayerView
 import com.example.livex.core.mvi.MviViewModel
 import com.example.livex.data.SampleStreams
+import com.example.livex.playback.DeviceCapabilities
 import com.example.livex.player.ads.SeekOutcome
 import com.example.livex.player.ads.VodProgress
 import com.example.livex.player.live.LiveLatency
@@ -34,7 +35,13 @@ class PlayerViewModel @Inject constructor(
     private val engine: PlaybackEngine,
     bufferSettingsRepository: BufferSettingsRepository,
     private val savedState: SavedStateHandle,
-) : MviViewModel<PlayerState, PlayerIntent, PlayerEffect>(PlayerState()) {
+    deviceCapabilities: DeviceCapabilities,
+) : MviViewModel<PlayerState, PlayerIntent, PlayerEffect>(
+    PlayerState(
+        supportsPictureInPicture = deviceCapabilities.supportsPictureInPicture,
+        playsInBackground = deviceCapabilities.playsInBackground,
+    ),
+) {
 
     /** Separate from [state]: a Player is a live object, not immutable UI data. */
     val player: StateFlow<Player?> = engine.player
@@ -93,6 +100,9 @@ class PlayerViewModel @Inject constructor(
     private var rebuildPending = false
 
     private var bufferSettingsLoaded = false
+
+    /** PiP window closed: the user stopped watching, so don't resume when the app comes back. */
+    private var skipNextResume = false
 
     init {
         engine.metrics
@@ -198,14 +208,27 @@ class PlayerViewModel @Inject constructor(
                 if (rebuildPending) {
                     rebuildPending = false
                     rebuild() // the new player starts playing by itself, so no resume()
+                } else if (skipNextResume) {
+                    skipNextResume = false
                 } else {
-                    engine.resume()
+                    engine.resume() // no-op if we didn't pause (background playback)
                 }
             }
             PlayerIntent.LifecycleStop -> {
                 isStopped = true
-                engine.pause()
+                // Phones: keep playing; PlaybackService's MediaSession keeps the process alive as a
+                // foreground service with a media notification. TV: pause (quality guidelines).
+                if (!currentState.playsInBackground) engine.pause()
                 saveState()
+            }
+            PlayerIntent.CoveredByOtherScreen -> {
+                isStopped = true
+                engine.pause() // the viewer is reading another screen of the app, not listening
+                saveState()
+            }
+            PlayerIntent.PictureInPictureClosed -> {
+                engine.pause()
+                skipNextResume = true
             }
         }
     }

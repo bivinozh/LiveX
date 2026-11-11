@@ -5,6 +5,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.livex.data.SampleStreams
+import com.example.livex.playback.FakeDeviceCapabilities
 import com.example.livex.settings.FakeBufferSettingsRepository
 import com.example.livex.testutil.MainDispatcherRule
 import org.junit.Assert.assertEquals
@@ -36,6 +37,7 @@ class PlayerViewModelPlaybackStateTest {
             engine,
             FakeBufferSettingsRepository(),
             SavedStateHandle(mapOf(PlayerViewModel.KEY_STREAM_ID to SampleStreams.liveHls.id)),
+            FakeDeviceCapabilities(),
         )
     }
 
@@ -78,6 +80,7 @@ class PlayerViewModelPlaybackStateTest {
             FakePlaybackEngine(),
             FakeBufferSettingsRepository(),
             SavedStateHandle(mapOf(PlayerViewModel.KEY_STREAM_ID to SampleStreams.widevineL1Only.id)),
+            FakeDeviceCapabilities(),
         )
 
         drmViewModel.playerListener.onPlayerError(error(PlaybackException.ERROR_CODE_DECODING_FAILED))

@@ -83,6 +83,10 @@ interface PlaybackEngine {
      */
     fun rejoinLiveEdge()
 
-    /** Frees the player completely; the engine can't be used afterwards. */
+    /**
+     * Stops playback for good and frees the player (decoders, buffers, network). The engine stays
+     * usable: the next [start] builds a new player. [player] becomes null, which also ends the
+     * MediaSession / notification in PlaybackService.
+     */
     fun release()
 }
