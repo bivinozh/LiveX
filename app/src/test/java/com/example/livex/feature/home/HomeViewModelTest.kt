@@ -113,6 +113,18 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `open device info emits navigate to device info`() = runTest {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.effects.test {
+            viewModel.onIntent(HomeIntent.OpenDeviceInfo)
+
+            assertEquals(HomeEffect.NavigateToDeviceInfo, awaitItem())
+        }
+    }
+
+    @Test
     fun `nothing is selected before the first click`() = runTest {
         val viewModel = createViewModel()
         advanceUntilIdle()

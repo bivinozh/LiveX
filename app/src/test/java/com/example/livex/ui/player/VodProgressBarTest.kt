@@ -14,6 +14,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.livex.player.PlayerIntent
 import com.example.livex.player.ads.AdBreak
 import com.example.livex.player.ads.VodProgress
+import com.example.livex.testutil.performDpadClick
 import com.example.livex.ui.theme.LiveXTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -30,6 +31,7 @@ class VodProgressBarTest {
     val composeRule = createComposeRule()
 
     private val sent = mutableListOf<PlayerIntent>()
+    private var playPauseCount = 0
 
     private val progress = VodProgress(
         positionMs = 83_000,
@@ -37,8 +39,36 @@ class VodProgressBarTest {
         adBreaks = listOf(AdBreak(0, isPlayed = true), AdBreak(298_000, isPlayed = false)),
     )
 
-    private fun setContent() = composeRule.setContent {
-        LiveXTheme { VodProgressBar(progress = progress, onIntent = { sent += it }) }
+    private fun setContent(isPlaying: Boolean = true) = composeRule.setContent {
+        LiveXTheme {
+            VodProgressBar(
+                progress = progress,
+                onIntent = { sent += it },
+                isPlaying = isPlaying,
+                onPlayPause = { playPauseCount++ },
+            )
+        }
+    }
+
+    @Test
+    fun okOnTheSeekBarTogglesPlayPause() {
+        setContent()
+        val bar = composeRule.onNodeWithTag(VOD_BAR_TAG)
+
+        bar.performSemanticsAction(SemanticsActions.RequestFocus)
+        bar.performKeyInput { pressKey(Key.DirectionCenter) }
+
+        assertEquals(1, playPauseCount)
+        assertEquals(emptyList<PlayerIntent>(), sent)
+    }
+
+    @Test
+    fun playPauseButtonShowsTheCurrentStateAndToggles() {
+        setContent(isPlaying = true)
+
+        composeRule.onNodeWithText("⏸ Pause").performDpadClick()
+
+        assertEquals(1, playPauseCount)
     }
 
     @Test

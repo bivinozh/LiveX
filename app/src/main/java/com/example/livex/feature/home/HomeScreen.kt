@@ -40,6 +40,7 @@ fun HomeScreen(
     onStreamSelected: (streamId: String) -> Unit,
     modifier: Modifier = Modifier,
     onOpenSessions: () -> Unit = {},
+    onOpenDeviceInfo: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -48,6 +49,7 @@ fun HomeScreen(
         when (effect) {
             is HomeEffect.NavigateToPlayer -> onStreamSelected(effect.streamId)
             HomeEffect.NavigateToSessions -> onOpenSessions()
+            HomeEffect.NavigateToDeviceInfo -> onOpenDeviceInfo()
         }
     }
 
@@ -118,7 +120,10 @@ private fun StreamList(
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.weight(1f),
                 )
-                Button(onClick = { onIntent(HomeIntent.OpenSessions) }) { Text("QoE sessions") }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(onClick = { onIntent(HomeIntent.OpenDeviceInfo) }) { Text("Device info") }
+                    Button(onClick = { onIntent(HomeIntent.OpenSessions) }) { Text("QoE sessions") }
+                }
             }
         }
         itemsIndexed(streams, key = { _, stream -> stream.id }) { index, stream ->

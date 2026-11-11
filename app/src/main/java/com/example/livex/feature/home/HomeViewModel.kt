@@ -26,6 +26,7 @@ class HomeViewModel @Inject constructor(
                 sendEffect(HomeEffect.NavigateToPlayer(intent.streamId))
             }
             HomeIntent.OpenSessions -> sendEffect(HomeEffect.NavigateToSessions)
+            HomeIntent.OpenDeviceInfo -> sendEffect(HomeEffect.NavigateToDeviceInfo)
         }
     }
 

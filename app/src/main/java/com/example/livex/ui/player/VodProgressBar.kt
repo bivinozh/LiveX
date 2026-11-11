@@ -7,6 +7,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -16,7 +17,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -32,6 +36,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.tv.material3.Button
+import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.example.livex.player.PlayerIntent
@@ -50,10 +56,19 @@ private val AdWatched = Color(0xFF9E9E9E)
 
 /**
  * VOD seek bar with ad break markers: yellow = unwatched (seeking past it plays it first),
- * grey = watched. Left/Right seek ±10 s; the engine's AdSeekPolicy decides what actually happens.
+ * grey = watched. Remote: Left/Right seek ±10 s (the engine's AdSeekPolicy decides what actually
+ * happens), OK toggles play/pause, like most TV players.
  */
+@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-fun VodProgressBar(progress: VodProgress, onIntent: (PlayerIntent) -> Unit, modifier: Modifier = Modifier) {
+fun VodProgressBar(
+    progress: VodProgress,
+    onIntent: (PlayerIntent) -> Unit,
+    modifier: Modifier = Modifier,
+    isPlaying: Boolean = false,
+    onPlayPause: () -> Unit = {},
+    seekBarFocus: FocusRequester = remember { FocusRequester() },
+) {
     var focused by remember { mutableStateOf(false) }
     Column(
         modifier = modifier
@@ -62,8 +77,14 @@ fun VodProgressBar(progress: VodProgress, onIntent: (PlayerIntent) -> Unit, modi
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            PlayPauseButton(isPlaying, onPlayPause)
             Text(progress.timeLabel, style = MaterialTheme.typography.titleSmall, color = Color.White)
+            Spacer(Modifier.weight(1f))
             Text(progress.adSummary, style = MaterialTheme.typography.labelMedium, color = Muted)
         }
         Canvas(
@@ -72,12 +93,14 @@ fun VodProgressBar(progress: VodProgress, onIntent: (PlayerIntent) -> Unit, modi
                 .height(18.dp)
                 .testTag(VOD_BAR_TAG)
                 .semantics { contentDescription = "Progress ${progress.timeLabel}, ${progress.adSummary}" }
+                .focusRequester(seekBarFocus)
                 .onFocusChanged { focused = it.isFocused }
                 .onKeyEvent { event ->
                     if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
                     when (event.key) {
                         Key.DirectionLeft -> { onIntent(PlayerIntent.SeekBy(-SEEK_STEP_MS)); true }
                         Key.DirectionRight -> { onIntent(PlayerIntent.SeekBy(SEEK_STEP_MS)); true }
+                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> { onPlayPause(); true }
                         else -> false
                     }
                 }
@@ -100,6 +123,13 @@ fun VodProgressBar(progress: VodProgress, onIntent: (PlayerIntent) -> Unit, modi
             drawCircle(Color.White, radius = size.height * 0.9f, center = Offset(size.width * progress.positionFraction, size.height / 2))
         }
     }
+}
+
+/** Shared by the VOD and live bars. A real button, so it also works with touch and a mouse. */
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+internal fun PlayPauseButton(isPlaying: Boolean, onPlayPause: () -> Unit) {
+    Button(onClick = onPlayPause) { Text(if (isPlaying) "⏸ Pause" else "▶ Play") }
 }
 
 @Preview(widthDp = 520, heightDp = 110, backgroundColor = 0xFF445566, showBackground = true)

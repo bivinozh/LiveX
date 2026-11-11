@@ -5,6 +5,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.livex.device.DeviceInfoScreen
 import com.example.livex.feature.home.HomeScreen
 import com.example.livex.feature.sessions.SessionsScreen
 import com.example.livex.manifest.ManifestScreen
@@ -34,6 +35,10 @@ data object BufferSettingsRoute
 @Serializable
 data object SessionsRoute
 
+/** Decoder / display / memory capabilities (MediaCodecList). */
+@Serializable
+data object DeviceInfoRoute
+
 @Composable
 fun LiveXNavHost(navController: NavHostController = rememberNavController()) {
     NavHost(navController = navController, startDestination = HomeRoute) {
@@ -41,6 +46,7 @@ fun LiveXNavHost(navController: NavHostController = rememberNavController()) {
             HomeScreen(
                 onStreamSelected = { streamId -> navController.navigate(PlayerRoute(streamId)) },
                 onOpenSessions = { navController.navigate(SessionsRoute) },
+                onOpenDeviceInfo = { navController.navigate(DeviceInfoRoute) },
             )
         }
         // Each destination gets its own ViewModelStore: leaving the player (Back) clears
@@ -60,6 +66,9 @@ fun LiveXNavHost(navController: NavHostController = rememberNavController()) {
         }
         composable<SessionsRoute> {
             SessionsScreen()
+        }
+        composable<DeviceInfoRoute> {
+            DeviceInfoScreen()
         }
     }
 }

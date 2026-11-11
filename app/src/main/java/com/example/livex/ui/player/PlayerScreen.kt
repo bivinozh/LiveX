@@ -6,6 +6,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.focus.FocusRequester
+import androidx.media3.common.util.Util
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,6 +37,7 @@ import com.example.livex.player.PlayerIntent
 import com.example.livex.player.PlayerUiState
 import com.example.livex.player.PlayerViewModel
 
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun PlayerScreen(
     onOpenManifest: (streamId: String) -> Unit,
@@ -48,12 +53,25 @@ fun PlayerScreen(
     val controller = rememberMediaController()
     val inPip = rememberIsInPictureInPictureMode()
     var videoBounds by remember { mutableStateOf<android.graphics.Rect?>(null) }
+    val playWhenReady = rememberPlayWhenReady(controller)
+    // Play/pause through the session, exactly like the notification or a remote's media key.
+    // handlePlayPauseButtonAction also restarts an ended video and re-prepares an idle one.
+    val onPlayPause: () -> Unit = { controller?.let { Util.handlePlayPauseButtonAction(it) } }
+    val seekBarFocus = remember { FocusRequester() }
 
     PlayerLifecycleEffect(onIntent = viewModel::onIntent)
 
+    // Guide hidden = "watching" mode: the seek bar gets focus, so Left/Right seek and OK pauses at once.
+    // (Waits a frame: the bar appears in the same composition; if there's none, "Show guide" keeps focus.)
+    LaunchedEffect(state.isGuideVisible, inPip) {
+        if (state.isGuideVisible || inPip) return@LaunchedEffect
+        withFrameNanos { }
+        runCatching { seekBarFocus.requestFocus() }
+    }
+
     if (state.supportsPictureInPicture) {
         PictureInPictureEffect(
-            enabled = rememberPlayWhenReady(controller) && state.playback !is PlayerUiState.Error,
+            enabled = playWhenReady && state.playback !is PlayerUiState.Error,
             videoWidth = state.metrics.videoWidth,
             videoHeight = state.metrics.videoHeight,
             sourceRect = videoBounds,
@@ -98,6 +116,9 @@ fun PlayerScreen(
         // PiP window: video only, no overlays.
         if (inPip) return@Box
 
+        // Bottom bars end left of the guide panel, or left of the "Show guide" button when it's hidden.
+        val bottomBarEndInset = if (state.isGuideVisible) GuidePanelWidth else ShowGuideButtonSpace
+
         if (state.isStatsVisible) {
             // Collected only while visible: when hidden, nothing recomposes on the 500 ms ticks.
             val stats by viewModel.stats.collectAsStateWithLifecycle()
@@ -112,9 +133,12 @@ fun PlayerScreen(
                     live = window,
                     latency = state.config.liveLatency,
                     onIntent = viewModel::onIntent,
+                    isPlaying = playWhenReady,
+                    onPlayPause = onPlayPause,
+                    seekBarFocus = seekBarFocus,
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .padding(start = 24.dp, bottom = 24.dp, end = 24.dp + if (state.isGuideVisible) GuidePanelWidth else 0.dp),
+                        .padding(start = 24.dp, bottom = 24.dp, end = 24.dp + bottomBarEndInset),
                 )
             }
         } else {
@@ -124,9 +148,12 @@ fun PlayerScreen(
                 VodProgressBar(
                     progress = it,
                     onIntent = viewModel::onIntent,
+                    isPlaying = playWhenReady,
+                    onPlayPause = onPlayPause,
+                    seekBarFocus = seekBarFocus,
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .padding(start = 24.dp, bottom = 24.dp, end = 24.dp + if (state.isGuideVisible) GuidePanelWidth else 0.dp),
+                        .padding(start = 24.dp, bottom = 24.dp, end = 24.dp + bottomBarEndInset),
                 )
             }
         }

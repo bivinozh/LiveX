@@ -21,9 +21,11 @@ sealed interface HomeIntent : UiIntent {
     data object Retry : HomeIntent
     data class StreamClicked(val streamId: String) : HomeIntent
     data object OpenSessions : HomeIntent
+    data object OpenDeviceInfo : HomeIntent
 }
 
 sealed interface HomeEffect : UiEffect {
     data class NavigateToPlayer(val streamId: String) : HomeEffect
     data object NavigateToSessions : HomeEffect
+    data object NavigateToDeviceInfo : HomeEffect
 }

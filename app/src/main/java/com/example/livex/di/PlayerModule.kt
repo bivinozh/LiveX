@@ -1,5 +1,7 @@
 package com.example.livex.di
 
+import com.example.livex.device.AndroidDeviceInfoReader
+import com.example.livex.device.DeviceInfoReader
 import com.example.livex.playback.AndroidDeviceCapabilities
 import com.example.livex.playback.DeviceCapabilities
 import com.example.livex.player.ExoPlaybackEngine
@@ -26,4 +28,7 @@ abstract class PlayerModule {
     @Binds
     @Singleton
     abstract fun bindDeviceCapabilities(impl: AndroidDeviceCapabilities): DeviceCapabilities
+
+    @Binds
+    abstract fun bindDeviceInfoReader(impl: AndroidDeviceInfoReader): DeviceInfoReader
 }
