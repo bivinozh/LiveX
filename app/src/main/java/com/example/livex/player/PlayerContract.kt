@@ -31,6 +31,10 @@ data class PlayerState(
     val ad: AdState = AdState(),
     /** This device's Widevine level (shown for protected streams). */
     val widevine: WidevineInfo? = null,
+    /** Phones/tablets: the player shrinks into a PiP window when the user leaves the app. */
+    val supportsPictureInPicture: Boolean = false,
+    /** Phones: audio keeps playing in the background (media notification). TV: pauses. */
+    val playsInBackground: Boolean = false,
 ) : UiState {
     val topic: Topic get() = topics[topicIndex]
     val isOptimizationEnabled: Boolean
@@ -66,8 +70,20 @@ sealed interface PlayerIntent : UiIntent {
     /** App came to the foreground (Lifecycle ON_START). */
     data object LifecycleStart : PlayerIntent
 
-    /** App went to the background (Lifecycle ON_STOP). */
+    /** App went to the background (Lifecycle ON_STOP with the Activity stopping too). */
     data object LifecycleStop : PlayerIntent
+
+    /**
+     * Another screen of the app opened on top (manifest viewer, buffer settings): the player
+     * destination stops while the app stays in the foreground. Always pauses.
+     */
+    data object CoveredByOtherScreen : PlayerIntent
+
+    /**
+     * The user closed the PiP window (the Activity stops while still in PiP mode). They dismissed
+     * the video, so stop playing: no background audio, no auto-resume when they come back.
+     */
+    data object PictureInPictureClosed : PlayerIntent
 }
 
 sealed interface PlayerEffect : UiEffect {

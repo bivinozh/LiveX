@@ -5,6 +5,7 @@ import app.cash.turbine.test
 import com.example.livex.data.SampleStreams
 import com.example.livex.data.Topics
 import com.example.livex.navigation.PlayerRoute
+import com.example.livex.playback.FakeDeviceCapabilities
 import com.example.livex.player.ads.AdBreakKind
 import com.example.livex.player.ads.AdState
 import com.example.livex.player.drm.WidevineInfo
@@ -44,14 +45,19 @@ class PlayerViewModelTest {
         engine = FakePlaybackEngine()
         settings = FakeBufferSettingsRepository()
         savedState = SavedStateHandle(mapOf(PlayerViewModel.KEY_STREAM_ID to SampleStreams.bigBuckBunny.id))
-        viewModel = PlayerViewModel(engine, settings, savedState)
+        viewModel = PlayerViewModel(engine, settings, savedState, FakeDeviceCapabilities())
     }
 
     /** A new ViewModel created from [saved] (navigation argument and/or state restored after process death). */
-    private fun create(saved: Map<String, Any?>): PlayerViewModel {
+    private fun create(
+        saved: Map<String, Any?>,
+        device: FakeDeviceCapabilities = FakeDeviceCapabilities(),
+    ): PlayerViewModel {
         engine = FakePlaybackEngine()
-        return PlayerViewModel(engine, settings, SavedStateHandle(saved))
+        return PlayerViewModel(engine, settings, SavedStateHandle(saved), device)
     }
+
+    private fun phone() = create(mapOf(PlayerViewModel.KEY_STREAM_ID to SampleStreams.bigBuckBunny.id), FakeDeviceCapabilities.PHONE)
 
     private fun goToTopic(index: Int) = repeat(index) { viewModel.onIntent(PlayerIntent.NextTopic) }
 
@@ -90,6 +96,60 @@ class PlayerViewModelTest {
         viewModel.onIntent(PlayerIntent.LifecycleStop)
 
         assertEquals(1, engine.pauseCount)
+    }
+
+    // --- Background playback and PiP (Step 18) ---
+
+    @Test
+    fun `phone keeps playing when the app goes to the background`() {
+        val vm = phone()
+
+        vm.onIntent(PlayerIntent.LifecycleStop)
+
+        assertEquals(0, engine.pauseCount)
+        assertTrue(vm.state.value.playsInBackground)
+    }
+
+    @Test
+    fun `phone still pauses when another screen of the app covers the player`() {
+        val vm = phone()
+
+        vm.onIntent(PlayerIntent.CoveredByOtherScreen)
+        vm.onIntent(PlayerIntent.LifecycleStart)
+
+        assertEquals(1, engine.pauseCount)
+        assertEquals(1, engine.resumeCount)
+    }
+
+    @Test
+    fun `tv pauses in the background and has no PiP`() {
+        viewModel.onIntent(PlayerIntent.LifecycleStop)
+
+        assertEquals(1, engine.pauseCount)
+        assertFalse(viewModel.state.value.playsInBackground)
+        assertFalse(viewModel.state.value.supportsPictureInPicture)
+    }
+
+    @Test
+    fun `phone supports picture in picture`() {
+        assertTrue(phone().state.value.supportsPictureInPicture)
+    }
+
+    @Test
+    fun `closing the PiP window pauses and does not auto-resume on return`() {
+        val vm = phone()
+
+        vm.onIntent(PlayerIntent.PictureInPictureClosed)
+        vm.onIntent(PlayerIntent.LifecycleStop)
+        vm.onIntent(PlayerIntent.LifecycleStart)
+
+        assertEquals(1, engine.pauseCount)
+        assertEquals(0, engine.resumeCount)
+
+        // Only that one return is skipped.
+        vm.onIntent(PlayerIntent.LifecycleStop)
+        vm.onIntent(PlayerIntent.LifecycleStart)
+        assertEquals(1, engine.resumeCount)
     }
 
     @Test

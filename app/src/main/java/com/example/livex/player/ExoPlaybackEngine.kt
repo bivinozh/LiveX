@@ -6,7 +6,9 @@ import android.os.SystemClock
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import android.net.Uri
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Timeline
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -55,7 +57,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -69,7 +70,10 @@ import kotlin.time.Duration.Companion.milliseconds
 /** How often the stats overlay (and buffered duration) is refreshed. */
 private val STATS_INTERVAL = 500.milliseconds
 
-/** ExoPlayer-backed [PlaybackEngine]; one instance per PlayerViewModel (ViewModel-scoped in Hilt). */
+/**
+ * ExoPlayer-backed [PlaybackEngine]. App-wide singleton: the PlayerViewModel drives it and the
+ * PlaybackService publishes its current player through a MediaSession.
+ */
 @OptIn(UnstableApi::class)
 class ExoPlaybackEngine @Inject constructor(
     @param:ApplicationContext private val context: Context,
@@ -331,6 +335,14 @@ class ExoPlaybackEngine @Inject constructor(
                     setUri(stream.url).setMimeType(stream.mimeType)
                 }
             }
+            // What the media notification, lock screen and TV "now playing" card show.
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(stream.title)
+                    .setArtist("LiveX · ${stream.formatLabel}")
+                    .setIsPlayable(true)
+                    .build(),
+            )
             .apply {
                 // Live latency control: target offset + the speed range LivePlaybackSpeedControl may
                 // use to hold it. Overrides the manifest's own suggestion (e.g. DASH ServiceDescription).
@@ -416,12 +428,14 @@ class ExoPlaybackEngine @Inject constructor(
     }
 
     override fun release() {
-        scope.cancel()
         // The viewer left (Back). Before the first frame, this is an EBVS.
         qoeEvents.endSession(SystemClock.elapsedRealtime(), EndReason.EXIT)
         releasePlayer()
-        // After the player: setPlayer(null) + release() frees the IMA SDK and its ad display container.
-        ads.release()
+        // Forget the stream: reopening it later is a fresh start (position 0, new DAI session).
+        currentStream = null
+        resumeOnStart = false
+        // The engine itself (stats loop, IMA loader, throttle) lives on for the next start(); with
+        // no player, PlaybackService releases its MediaSession and stops (notification goes away).
     }
 
     private fun releasePlayer() {
@@ -488,6 +502,19 @@ class ExoPlaybackEngine @Inject constructor(
         val player = ExoPlayer.Builder(context)
             .setLoadControl(loadControl)
             .setMediaSourceFactory(mediaSourceFactory)
+            // Background playback etiquette:
+            // - audio focus: pause for a call or another media app, duck for navigation prompts;
+            // - becoming noisy: pause when headphones / Bluetooth disconnect (don't blast the speaker);
+            // - wake mode: keep CPU + Wi-Fi awake while playing with the screen off.
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                    .build(),
+                /* handleAudioFocus = */ true,
+            )
+            .setHandleAudioBecomingNoisy(true)
+            .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
 
         // Topic: ABR
